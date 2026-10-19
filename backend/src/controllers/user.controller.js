@@ -21,7 +21,7 @@ const generateAccessAndRefreshTokens = async (userId) => {
   }
 };
 
-// REGISTER USER CONTROLLER
+// 1-REGISTER USER CONTROLLER
 export const registerUser = asyncHandler(async (req, res) => {
   console.log("req.body:", req.body);
   console.log("req.files:", req.files);
@@ -102,7 +102,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, createdUser, "User registered successfully!"));
 });
 
-// LOGIN USER CONTROLLER
+// 2-LOGIN USER CONTROLLER
 export const loginUser = asyncHandler(async (req, res) => {
   // 1. Frontend se data lena (Image ke mutabiq single input 'username' ya 'email' ke liye ho sakta hai)
   const { username, email, password } = req.body;
@@ -168,7 +168,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-//LOGOUT USER CONTROLLER
+// 3-LOGOUT USER CONTROLLER
 export const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
@@ -194,7 +194,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out"));
 });
 
-//REFRESH TOKEN CONTROLLER
+// 4-REFRESH TOKEN CONTROLLER
 export const refreshAccessToken = asyncHandler(async (req, res) => {
   // 1. Cookies ya Header se incoming refresh token nikalna
   const incomingRefreshToken =
@@ -252,4 +252,39 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
         "Access token refreshed successfully! 🔄",
       ),
     );
+});
+
+// 5-CHANGE PASSWORD CONTROLLER
+export const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  // 1. Validation check: Dono fields mandatory hain
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Both old password and new password are required");
+  }
+
+  // 2. Database se user dhoondo password field ke saath
+  // (Kyunki humne verifyJWT me password select("-password") kiya tha, tou yahan explicitly password mangwana parega)
+  const user = await User.findById(req.user?._id).select("+password");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // 3. Check karo ke purana password sahi hai ya nahi
+  // (isPasswordCorrect aapke user schema ka custom method hoga jo bcrypt.compare use karta hai)
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "Invalid old password");
+  }
+
+  // 4. Naya password set karo aur save karo
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false }); // pre-save hook chalega aur password hash ho jayega
+
+  // 5. Clean response return karo
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully! 🔐"));
 });
