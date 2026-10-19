@@ -1,10 +1,7 @@
 import mongoose from "mongoose";
-
 import { Schema } from "mongoose";
 import { Video } from "./video.models.js";
-
-import bcrypt from "bcrypt"; // Password hashing ke liye
-
+import bcrypt from "bcrypt"; // Password hashing ke liy
 import jwt from "jsonwebtoken"; // JWT token generate karne ke liye
 
 const userSchema = new Schema(
