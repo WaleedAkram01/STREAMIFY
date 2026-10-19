@@ -4,8 +4,9 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import { sendEmail } from "../utils/sendEmail.js";
 
-// Helper function to generate tokens and save refresh token in database
+// Helper function to generate access and refresh tokens and save refresh token in database
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -301,4 +302,118 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
+});
+
+// 7-FORGOT PASSWORD CONTROLLER
+export const forgotPasswordSendOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ApiError(400, "Email is required.");
+  }
+
+  const user = await User.findOne({ email });
+
+  // Security Rule: Return generic success to prevent email fishing/enumerations
+  if (!user) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {},
+          "If this email is registered, a password reset OTP has been sent.",
+        ),
+      );
+  }
+
+  // Generate OTP
+  const otp = user.generateForgotPasswordOTP();
+  await user.save({ validateBeforeSave: false });
+
+  // Email HTML Message Template
+  const message = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <h1 style="color: #333333; text-align: center;">Password Reset Verification Code</h1>
+            <p style="font-size: 16px; color: #555555;">Your 6-digit password reset OTP is provided below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <h2 style="letter-spacing: 6px; color: #4F46E5; background-color: #f3f4f6; display: inline-block; padding: 12px 24px; border-radius: 6px; font-size: 32px; margin: 0;">${otp}</h2>
+            </div>
+            <p style="font-size: 14px; color: #777777; text-align: center;">This OTP is valid for only 1 minutes. Do not share it with anyone.</p>
+        </div>
+    `;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Your Password Reset OTP",
+      message,
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {},
+          "Verification OTP has been sent to your email address.",
+        ),
+      );
+  } catch (error) {
+    // Clear OTP fields in the database if email delivery fails
+    user.forgotPasswordOTP = undefined;
+    user.forgotPasswordOTPExpiry = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    throw new ApiError(500, "Failed to send email. Please try again later.");
+  }
+});
+
+// 8-RESET PASSWORD WITH OTP CONTROLLER
+export const resetPasswordWithOTP = asyncHandler(async (req, res) => {
+  const { email, otp, password, confirmPassword } = req.body;
+
+  if (!email || !otp || !password || !confirmPassword) {
+    throw new ApiError(
+      400,
+      "All fields (Email, OTP, Password, and Confirm Password) are required.",
+    );
+  }
+
+  if (password !== confirmPassword) {
+    throw new ApiError(400, "Passwords do not match.");
+  }
+
+  // User ko email, OTP, aur expiry ke sath search karein
+  const user = await User.findOne({
+    email: email?.toLowerCase().trim(),
+    forgotPasswordOTP: String(otp).trim(), // Body se string ata hai, isay string format mein clean match karein
+    forgotPasswordOTPExpiry: { $gt: Date.now() }, // Check karein ke expired na ho
+  });
+
+  if (!user) {
+    throw new ApiError(
+      400,
+      "Invalid OTP or the verification code has expired.",
+    );
+  }
+
+  // Naya password assign karein
+  user.password = password;
+
+  // Kaam khatam hone ke baad OTP fields ko database se saaf (clean) kar dein
+  user.forgotPasswordOTP = undefined;
+  user.forgotPasswordOTPExpiry = undefined;
+
+  await user.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        {},
+        "Password updated successfully. You can now log in.",
+      ),
+    );
 });

@@ -55,6 +55,14 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Password is required"],
     },
+    forgotPasswordOTP: {
+      type: Number, // 6 digit ka number save karne ke liye
+      default: undefined,
+    },
+    forgotPasswordOTPExpiry: {
+      type: Date, // OTP kab expire hoga
+      default: undefined,
+    },
     refreshToken: {
       type: String,
     },
@@ -108,6 +116,20 @@ userSchema.methods.generateRefreshToken = function () {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY, // Iska time lamba hota hai (e.g., 10d)
     },
   );
+};
+
+// 5. Method: Forgot Password OTP Generate Karna
+userSchema.methods.generateForgotPasswordOTP = function () {
+  // 100000 se 999999 ke beech aik random 6 digit number generate karein
+  const otp = Math.floor(100000 + Math.random() * 900000);
+
+  // Database mein directly save karne ke liye assign karein
+  this.forgotPasswordOTP = otp;
+
+  // OTP ki expiry kam rakhein (e.g., 5 minutes) kyunki OTP jaldi expire hona chahiye
+  this.forgotPasswordOTPExpiry = Date.now() + 1 * 60 * 1000;
+
+  return otp; // Controller ko return karein taake email mein bheja ja sakay
 };
 
 export const User = mongoose.model("User", userSchema);
