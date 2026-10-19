@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken";
 
 // Helper function to generate tokens and save refresh token in database
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -161,7 +162,8 @@ export const loginUser = asyncHandler(async (req, res) => {
         {
           user: loggedInUser,
           accessToken,
-          refreshToken,
+          // RefreshToken should not be sent like this
+          // refreshToken,
         },
         "User logged in successfully",
       ),
@@ -213,6 +215,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
     );
   } catch (error) {
+    console.log("JWT Verify Error:", error.message);
     throw new ApiError(401, "Invalid or expired refresh token");
   }
 
@@ -231,7 +234,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
   // 5. Cookie options setup
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production" ? true : false,
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   };
 
@@ -248,7 +251,11 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        { accessToken, refreshToken: newRefreshToken },
+        {
+          accessToken,
+          // RefreshToken should not be sent.
+          // refreshToken: newRefreshToken,
+        },
         "Access token refreshed successfully! 🔄",
       ),
     );
@@ -295,5 +302,3 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, req.user, "Current user fetched successfully"));
 });
-
-
