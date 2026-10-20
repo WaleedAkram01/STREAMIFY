@@ -8,6 +8,7 @@ import {
   getCurrentUser,
   forgotPasswordSendOTP,
   resetPasswordWithOTP,
+  updateAccountDetails,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -23,9 +24,7 @@ const resetPasswordLimiter = rateLimit({
     "Too many reset attempts from this IP, please try again after 5 minutes.",
 });
 
-
-// AUTH ROUTES 
-
+// AUTH ROUTES
 
 router.post(
   "/register",
@@ -42,6 +41,6 @@ router.post("/refresh-token", refreshAccessToken);
 router.post("/change-password", verifyJWT, changeCurrentPassword);
 router.post("/forgot-password", forgotPasswordSendOTP);
 router.post("/reset-password", resetPasswordLimiter, resetPasswordWithOTP);
-
+router.post("/update-profile", verifyJWT, updateAccountDetails);
 
 export default router;

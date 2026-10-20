@@ -417,3 +417,43 @@ export const resetPasswordWithOTP = asyncHandler(async (req, res) => {
       ),
     );
 });
+
+// 9-UPDATE ACCOUNT DETAILS CONTROLLER
+export const updateAccountDetails = asyncHandler(async (req, res) => {
+  // 1. Request body se inputs nikalein (fullName, username, aur email)
+  const { fullName, username, email } = req.body;
+
+  if (!fullName || !username || !email) {
+    throw new ApiError(
+      400,
+      "All fields (Full Name, Username, and Email) are required",
+    );
+  }
+
+  // 2. Find the user and update the fields using Mongoose's findByIdAndUpdate
+  const user = await User.findByIdAndUpdate(
+    req.user?._id, // verifyJWT middleware se id milegi
+    {
+      $set: {
+        fullName,
+        username: username?.toLowerCase().trim(), // Schema formatting rules applied
+        email: email?.toLowerCase().trim(),
+      },
+    },
+    {
+      new: true, // Database se naya updated document return karega
+      runValidators: true, // Schema ke duplicate check aur regex validations chalayega
+    },
+  ).select(
+    "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
+  ); // Yeh fields response mein nahi jayengi
+
+  if (!user) {
+    throw new ApiError(404, "User account not found.");
+  }
+
+  // 3. Updated user object standard API response ke sath return karein
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Account details updated successfully"));
+});
