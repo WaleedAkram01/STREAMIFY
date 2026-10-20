@@ -27,7 +27,7 @@ const resetPasswordLimiter = rateLimit({
 });
 
 // AUTH ROUTES
-
+//1- Register
 router.post(
   "/register",
   upload.fields([
@@ -36,15 +36,23 @@ router.post(
   ]),
   registerUser,
 );
+// 2-Login
 router.post("/login", loginUser);
+// 3-Logout
 router.post("/logout", verifyJWT, logoutUser);
+// 4- Get Current User
 router.get("/get-current-user", verifyJWT, getCurrentUser);
+// 5- Refresh Access Token
 router.post("/refresh-token", refreshAccessToken);
+//  6- Change Current Password
 router.post("/change-password", verifyJWT, changeCurrentPassword);
+// 7- Forgot Password
 router.post("/forgot-password", forgotPasswordSendOTP);
+// 8- Reset Password with OTP
 router.post("/reset-password", resetPasswordLimiter, resetPasswordWithOTP);
+// 9- Update Account Details
 router.post("/update-profile", verifyJWT, updateAccountDetails);
-// Route for changing avatar
+// 10- Route for changing avatar
 router.patch(
   "/update-avatar",
   verifyJWT,
@@ -52,7 +60,7 @@ router.patch(
   updateUserAvatar,
 );
 
-// Route for changing cover image
+// 11-Route for changing cover image
 router.patch(
   "/update-cover",
   verifyJWT,
