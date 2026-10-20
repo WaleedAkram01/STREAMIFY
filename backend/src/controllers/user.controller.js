@@ -90,7 +90,7 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   // 8. Security Optimization: Response bhejne se pehle password aur refresh token remove karna
   const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken",
+    "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
   );
 
   // Check karna ke user successfully database me create hua ya nahi
@@ -142,7 +142,7 @@ export const loginUser = asyncHandler(async (req, res) => {
 
   // 6. Response me se sensitive data ko remove karna security ke liye
   const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshToken",
+    "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
   );
 
   // 7. Cookies ke liye secure options configure karna
