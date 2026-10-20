@@ -12,6 +12,7 @@ import {
   updateUserAvatar,
   updateUserCoverImage,
   getUserChannelProfile,
+  getWatchHistory,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -69,6 +70,8 @@ router.patch(
   updateUserCoverImage,
 );
 // 12- Route for getting user channel profile by username
-router.get("/c/:username", verifyJWT, getUserChannelProfile);
+router.get("/channel/:username", verifyJWT, getUserChannelProfile);
+// 13- Route for getting user watch history
+router.route("/watch-history").get(verifyJWT, getWatchHistory);
 
 export default router;

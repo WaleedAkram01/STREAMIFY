@@ -654,3 +654,70 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
       new ApiResponse(200, channel[0], "User channel fetched successfully"),
     );
 });
+
+// 13-GET USER WATCH HISTORY CONTROLLER
+export const getWatchHistory = asyncHandler(async (req, res) => {
+  // 1. Target the current logged-in user using aggregation pipeline
+  const user = await User.aggregate([
+    {
+      //  Match user document from req.user._id safely
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id),
+      },
+    },
+    {
+      //  Lookup details from videos collection using watchHistory IDs
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            // Sub-pipeline to look up video owner profile metadata from users collection
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  //  Select only specific public creator fields
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1, // Passes through the complete structured { url, publicId } object safely
+                  },
+                },
+              ],
+            },
+          },
+          {
+            //  Deconstruct owner array into a single clean root object using $first
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  // Validation Check: If user calculation array returned empty values
+  if (!user?.length) {
+    throw new ApiError(404, "User watch history not found");
+  }
+
+  //  Extract watchHistory list from the matched user object element safely
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully",
+      ),
+    );
+});
