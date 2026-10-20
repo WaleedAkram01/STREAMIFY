@@ -573,3 +573,84 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
       new ApiResponse(200, updatedUser, "Cover image replaced successfully."),
     );
 });
+
+// 12-GET USER CHANNEL PROFILE CONTROLLER
+export const getUserChannelProfile = asyncHandler(async (req, res) => {
+  // Request params se channel ka username nikalna
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  // Advanced Aggregation Pipeline to compute subscribers dynamic data
+  const channel = await User.aggregate([
+    {
+      // Stage 1: Target the specified username safely
+      $match: {
+        username: username?.toLowerCase().trim(),
+      },
+    },
+    {
+      // Stage 2: Look up subscribers tracking details inside subscription data collection
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      // Stage 3: Look up how many unique channels this specific profile has subscribed to
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      // Stage 4: Add computed metric lengths and subscription flags dynamically
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelsSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      // Stage 5: Select specific items to return (Nested properties will pass through automatically)
+      $project: {
+        fullName: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelsSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1, // Passes the { url, publicId } object cleanly to frontend
+        coverImage: 1, // Passes the { url, publicId } object cleanly to frontend
+        email: 1,
+      },
+    },
+  ]);
+
+  // Validation Check if list contains match values
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel does not exist");
+  }
+
+  // Return first computed matrix match inside array layout wrapper object
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully"),
+    );
+});
