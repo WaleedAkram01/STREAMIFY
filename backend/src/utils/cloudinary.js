@@ -32,4 +32,22 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
+// To delete from cloudinary-When updating user profile.
+export const deleteFromCloudinary = async (publicId) => {
+  try {
+    if (!publicId) return null;
+
+    // Trigger the deletion command on Cloudinary servers
+    const response = await cloudinary.uploader.destroy(publicId);
+
+    return response;
+  } catch (error) {
+    console.error(
+      "Failed to delete asset from Cloudinary. Public ID: ",
+      publicId,
+      error,
+    );
+    return null;
+  }
+};
 export { uploadOnCloudinary };

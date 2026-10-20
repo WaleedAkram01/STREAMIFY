@@ -2,7 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.models.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "../utils/sendEmail.js";
 
@@ -456,4 +459,109 @@ export const updateAccountDetails = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, user, "Account details updated successfully"));
+});
+
+// 10-UPDATE AVATAR IMAGE CONTROLLER
+export const updateUserAvatar = asyncHandler(async (req, res) => {
+  // 1. Get the local file path from Multer middleware
+  const avatarLocalPath = req.file?.path;
+
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required.");
+  }
+
+  // 2. Fetch current user data to access their old avatar publicId
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  // 3. Delete previous asset from Cloudinary using nested property directly
+  if (user.avatar?.publicId) {
+    await deleteFromCloudinary(user.avatar.publicId);
+  }
+
+  // 4. Upload incoming local image file to Cloudinary
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  console.log(avatar);
+
+  if (!avatar || !avatar.url) {
+    throw new ApiError(400, "Error while uploading avatar to cloud storage.");
+  }
+
+  // 5. Update the nested object fields inside MongoDB
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: {
+          url: avatar.url, // Cloudinary URL
+          publicId: avatar.public_id, // Cloudinary Public ID
+        },
+      },
+    },
+    { new: true },
+  ).select(
+    "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedUser, "Avatar image replaced successfully."),
+    );
+});
+
+// 11-UPDATE COVER IMAGE CONTROLLER
+export const updateUserCoverImage = asyncHandler(async (req, res) => {
+  // 1. Get the local file path from Multer middleware
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover image file is required.");
+  }
+
+  // 2. Fetch current user data to access old cover publicId
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  // 3. Delete previous cover image if it exists
+  if (user.coverImage?.publicId) {
+    await deleteFromCloudinary(user.coverImage.publicId);
+  }
+
+  // 4. Upload the incoming local cover image to Cloudinary
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  console.log(coverImage);
+
+  if (!coverImage || !coverImage.url) {
+    throw new ApiError(
+      400,
+      "Error while uploading cover image to cloud storage.",
+    );
+  }
+
+  // 5. Update the nested fields inside MongoDB
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: {
+          url: coverImage.url,
+          publicId: coverImage.public_id,
+        },
+      },
+    },
+    { new: true },
+  ).select(
+    "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedUser, "Cover image replaced successfully."),
+    );
 });

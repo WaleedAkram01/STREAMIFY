@@ -43,13 +43,24 @@ const userSchema = new Schema(
       match: [/^[a-zA-Z\s]+$/, "Full name can only contain letters and spaces"],
     },
     avatar: {
-      type: String, // Cloudinary ya kisi aur cloud platform ka secure URL yahan save hoga
-      required: [true, "Avatar image URL is required"],
-      trim: true,
+      url: {
+        type: String, // Cloudinary ka secure URL yahan save hoga
+        required: [true, "Avatar image URL is required"], //Custom message agar avatar URL missing ho
+        trim: true, // Agar link me koi space ho toh remove ho jaye
+      },
+      publicId: {
+        type: String,
+        required: [true, "Avatar public ID is required"],
+      },
     },
     coverImage: {
-      type: String, // Cloudinary ka secure URL yahan save hoga
-      trim: true, // Agar link me koi space ho toh remove ho jaye
+      url: {
+        type: String,
+        trim: true,
+      },
+      publicId: {
+        type: String,
+      },
     },
     password: {
       type: String,

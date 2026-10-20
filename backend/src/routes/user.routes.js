@@ -9,6 +9,8 @@ import {
   forgotPasswordSendOTP,
   resetPasswordWithOTP,
   updateAccountDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -42,5 +44,20 @@ router.post("/change-password", verifyJWT, changeCurrentPassword);
 router.post("/forgot-password", forgotPasswordSendOTP);
 router.post("/reset-password", resetPasswordLimiter, resetPasswordWithOTP);
 router.post("/update-profile", verifyJWT, updateAccountDetails);
+// Route for changing avatar
+router.patch(
+  "/update-avatar",
+  verifyJWT,
+  upload.single("avatar"), // Postman field key name must match "avatar"
+  updateUserAvatar,
+);
+
+// Route for changing cover image
+router.patch(
+  "/update-cover",
+  verifyJWT,
+  upload.single("coverImage"),
+  updateUserCoverImage,
+);
 
 export default router;
