@@ -18,12 +18,12 @@ import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-// Ek IP 5 minutes mein sirf 5 dafa hi reset attempt ho sakegi
+// Ek IP 2 minutes mein sirf 5 dafa hi reset attempt ho sakegi
 const resetPasswordLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
+  windowMs: 2 * 60 * 1000, // 2 minutes
   max: 5,
   message:
-    "Too many reset attempts from this IP, please try again after 5 minutes.",
+    "Too many reset attempts from this IP, please try again after 2 minutes.",
 });
 
 // AUTH ROUTES

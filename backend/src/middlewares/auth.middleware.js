@@ -14,7 +14,7 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
   }
 
   // 2. Token ko verify karna secret key ke saath
-  // verify function error throw kar sakta hai agar token expired ya invalid ho, isko safe handle karne ke liye inner try-catch lagaya hai
+  // verify function error throw kar sakta hai agar token expired ya invalid ho, isko safe handle karne ke liye inner try-catch lagaya hai.
   let decodedToken;
   try {
     decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
