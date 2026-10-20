@@ -84,8 +84,16 @@ export const registerUser = asyncHandler(async (req, res) => {
   // 7. Database mein naya User object (entry) create karna
   const user = await User.create({
     fullName,
-    avatar: avatar.url, // Cloudinary ka secure web URL
-    coverImage: coverImage?.url || "", // Agar upload hua toh URL, warna empty string
+    avatar: {
+      url: avatar.url,
+      publicId: avatar.public_id,
+    },
+    coverImage: coverImage
+      ? {
+          url: coverImage.url,
+          publicId: coverImage.public_id,
+        }
+      : undefined,
     email,
     password, // Yeh save hone se pehle model ka pre-save hook automatic hash kar dega
     username: username,
