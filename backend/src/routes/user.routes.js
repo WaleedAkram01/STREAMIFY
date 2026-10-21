@@ -72,6 +72,6 @@ router.patch(
 // 12- Route for getting user channel profile by username
 router.get("/channel/:username", verifyJWT, getUserChannelProfile);
 // 13- Route for getting user watch history
-router.route("/watch-history").get(verifyJWT, getWatchHistory);
+router.get("/watch-history", verifyJWT, getWatchHistory);
 
 export default router;
