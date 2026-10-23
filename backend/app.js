@@ -2,9 +2,10 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import userRoutes from "./src/routes/user.routes.js";
+import videoRoutes from "./src/routes/video.routes.js";
+
 const app = express();
 
-// Common Middlewares
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "*",
@@ -12,13 +13,15 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: "16kb" }));
-app.use(express.urlencoded({ extended: true, limit: "16kb" }));
+app.use(express.json({ limit: "20gb" }));
+app.use(express.urlencoded({ extended: true, limit: "20gb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
 // Use the user routes
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/videos", videoRoutes);
+
 // Sample Route (Testing ke liye)
 app.get("/", (req, res) => {
   res.json({ message: "API is working perfectly!" });

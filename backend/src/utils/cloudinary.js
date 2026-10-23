@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
+import { Readable } from "stream"; // FIX 1: Yeh native module import hona zaroori hai buffer pipe ke liye
 
 // Cloudinary Configuration
 cloudinary.config({
@@ -8,23 +9,18 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadOnCloudinary = async (localFilePath) => {
+// METHOD 1: Existing Method For Images / Local Files (Disk Storage)
+export const uploadOnCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath) return null;
-
-    // File ko cloudinary par upload karne ka code
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
     });
-
-    // Pehle check karein agar file sach mein folder mein maujood hai tabhi delete karein
     if (fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
     }
-
     return response;
   } catch (error) {
-    // Agar upload fail ho jaye, toh check karke safe side par remove karein taake crash na ho
     if (fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
     }
@@ -32,14 +28,51 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
-// To delete from cloudinary-When updating user profile.
+// METHOD 2: New Method For Heavy Videos (Memory Storage Buffer Stream)
+export const uploadVideoOnCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    if (!fileBuffer) return resolve(null);
+
+    // FIX 2: upload_large_stream ki jagah 'upload_chunked_stream' use hota hai SDK mein
+    const cld_upload_stream = cloudinary.uploader.upload_chunked_stream(
+      {
+        resource_type: "video",
+        chunk_size: 6000000, // 6MB chunks background pipeline
+        eager: [{ streaming_profile: "hd", format: "m3u8" }], // Auto HLS format
+        eager_async: true, // Async background conversion
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      },
+    );
+
+    Readable.from(fileBuffer).pipe(cld_upload_stream);
+  });
+};
+
+// METHOD 3: New Method For Custom Thumbnail Image (Memory Storage Buffer Stream)
+export const uploadImageBufferOnCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    if (!fileBuffer) return resolve(null);
+
+    const cld_upload_stream = cloudinary.uploader.upload_stream(
+      { resource_type: "image" },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      },
+    );
+
+    Readable.from(fileBuffer).pipe(cld_upload_stream);
+  });
+};
+
+// To delete from cloudinary
 export const deleteFromCloudinary = async (publicId) => {
   try {
     if (!publicId) return null;
-
-    // Trigger the deletion command on Cloudinary servers
     const response = await cloudinary.uploader.destroy(publicId);
-
     return response;
   } catch (error) {
     console.error(
@@ -50,4 +83,3 @@ export const deleteFromCloudinary = async (publicId) => {
     return null;
   }
 };
-export { uploadOnCloudinary };
