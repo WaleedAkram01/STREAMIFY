@@ -7,7 +7,7 @@ import {
 } from "../utils/cloudinary.js";
 import { Video } from "../models/video.models.js";
 
-// HELPER FUNCTION: Seconds ko "MM:SS" string mein convert karne ke liye
+// HELPER FUNCTION: Seconds ko "MM:SS" format mein convert karne ke liye
 const formatDuration = (totalSeconds) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.round(totalSeconds % 60);
@@ -25,8 +25,8 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Description is strictly required");
   }
 
-  const videoFile = req.files?.video?.[0];
-  const thumbnailFile = req.files?.thumbnail?.[0];
+  const videoFile = req.files?.video?.[0]; // Array tracking fixed
+  const thumbnailFile = req.files?.thumbnail?.[0]; // Array tracking fixed
 
   if (!videoFile || !videoFile.buffer) {
     throw new ApiError(400, "Video file is required");
@@ -38,9 +38,10 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload video to cloud storage");
   }
 
+  // FIX HERE: Cloudinary eager response hamesha ek array hota hai, isliye indexing lagana lazmi hai
   const hlsStreamingUrl =
-    videoUploadResult.eager && videoUploadResult.eager
-      ? videoUploadResult.eager.secure_url
+    videoUploadResult.eager && videoUploadResult.eager[0]
+      ? videoUploadResult.eager[0].secure_url
       : videoUploadResult.secure_url;
 
   let finalThumbnailUrl = "";
@@ -61,21 +62,18 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  // Raw duration seconds nikalna
   const rawSeconds = videoUploadResult.duration
     ? Number(videoUploadResult.duration)
     : 0;
-
-  // Format conversion: e.g., 127 seconds ban jayenge "02:07"
   const formattedDurationText = formatDuration(rawSeconds);
 
   // Database Document Creation
   const video = await Video.create({
     title,
     description,
-    videoFile: hlsStreamingUrl,
+    videoFile: hlsStreamingUrl, // Mapping secure URL path
     thumbnail: finalThumbnailUrl,
-    duration: formattedDurationText, // FIX HERE: Direct formatted string "02:07" save hogi schema mein
+    duration: formattedDurationText, // Saaf suthri "02:07" format text string save hogi
     isPublished: true,
     owner: req.user?._id,
   });
@@ -84,7 +82,6 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Error while saving video document");
   }
 
-  // Response mein direct database data wapis bhej diya bina koi extra key banaye
   return res
     .status(201)
     .json(
