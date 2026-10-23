@@ -27,7 +27,7 @@ const videoSchema = new Schema(
       trim: true,
     },
     duration: {
-      type: Number, // Cloudinary upload ke baad automatic duration seconds me milti hai
+      type: String, // Cloudinary se milne wali duration string ko store karenge
       required: [true, "Video duration is required"],
     },
     views: {

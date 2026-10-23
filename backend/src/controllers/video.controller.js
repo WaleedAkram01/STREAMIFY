@@ -5,24 +5,26 @@ import {
   uploadVideoOnCloudinary,
   uploadImageBufferOnCloudinary,
 } from "../utils/cloudinary.js";
-import { Video } from "../models/video.models.js"; // Aapka model inject kiya
+import { Video } from "../models/video.models.js";
+
+// HELPER FUNCTION: Seconds ko "MM:SS" string mein convert karne ke liye
+const formatDuration = (totalSeconds) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
 
 export const PublishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
 
-  // 1. Strict Validation Check as per your Schema requirements
   if (!title || title.trim() === "") {
     throw new ApiError(400, "Video title is strictly required");
   }
 
   if (!description || description.trim() === "") {
-    throw new ApiError(
-      400,
-      "Description is strictly required as per schema configuration",
-    );
+    throw new ApiError(400, "Description is strictly required");
   }
 
-  // Files validation tracking from memory storage
   const videoFile = req.files?.video?.[0];
   const thumbnailFile = req.files?.thumbnail?.[0];
 
@@ -30,23 +32,19 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Video file is required");
   }
 
-  // 2. Heavy Video stream upload pipeline trigger kiya
   const videoUploadResult = await uploadVideoOnCloudinary(videoFile.buffer);
 
   if (!videoUploadResult) {
     throw new ApiError(500, "Failed to upload video to cloud storage");
   }
 
-  // Cloudinary se master adaptive HLS link extract karna (.m3u8 index map)
   const hlsStreamingUrl =
-    videoUploadResult.eager && videoUploadResult.eager[0]
-      ? videoUploadResult.eager[0].secure_url
+    videoUploadResult.eager && videoUploadResult.eager
+      ? videoUploadResult.eager.secure_url
       : videoUploadResult.secure_url;
 
-  // 3. Thumbnail Logic allocation
   let finalThumbnailUrl = "";
 
-  // CASE A: User uploads custom thumbnail image
   if (thumbnailFile && thumbnailFile.buffer) {
     const customThumbResult = await uploadImageBufferOnCloudinary(
       thumbnailFile.buffer,
@@ -56,7 +54,6 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     }
   }
 
-  // CASE B: Fallback video snapshot layer allocation
   if (!finalThumbnailUrl) {
     finalThumbnailUrl = videoUploadResult.secure_url.replace(
       /\.[^/.]+$/,
@@ -64,30 +61,30 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  // 4. Strict Schema Verification check for Duration
-  // Agar asset duration metadata directly fetch na ho, to safe side fallback default float add kiya
-  const videoDuration = videoUploadResult.duration
+  // Raw duration seconds nikalna
+  const rawSeconds = videoUploadResult.duration
     ? Number(videoUploadResult.duration)
-    : 10.0;
+    : 0;
 
-  // 5. Database Document mapping exactly as per your fields
+  // Format conversion: e.g., 127 seconds ban jayenge "02:07"
+  const formattedDurationText = formatDuration(rawSeconds);
+
+  // Database Document Creation
   const video = await Video.create({
     title,
-    description, // Directly matching strict validation
-    videoFile: hlsStreamingUrl, // Mapping schema secure URL link
-    thumbnail: finalThumbnailUrl, // Matching required thumbnail key
-    duration: videoDuration, // Mapping float/number sequence required validation
+    description,
+    videoFile: hlsStreamingUrl,
+    thumbnail: finalThumbnailUrl,
+    duration: formattedDurationText, // FIX HERE: Direct formatted string "02:07" save hogi schema mein
     isPublished: true,
-    owner: req.user?._id, // verifyJWT global token session value
+    owner: req.user?._id,
   });
 
   if (!video) {
-    throw new ApiError(
-      500,
-      "Something went wrong while saving video document tracking record",
-    );
+    throw new ApiError(500, "Error while saving video document");
   }
 
+  // Response mein direct database data wapis bhej diya bina koi extra key banaye
   return res
     .status(201)
     .json(
