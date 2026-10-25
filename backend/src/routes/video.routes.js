@@ -8,6 +8,8 @@ const router = Router();
 
 router.use(verifyJWT);
 
+router.get("/get-all", getAllVideos);
+
 router.post(
   "/publish-video",
   uploadVideoFields.fields([
