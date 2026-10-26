@@ -6,7 +6,7 @@ import {
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 // Bilkul sahi naam jo aapne abhi dikhaya:
-import { uploadVideoFields } from "../middlewares/multer.middleware.js";
+import { uploadVideoFields, upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
@@ -23,6 +23,6 @@ router.post(
   PublishAVideo,
 );
 
-router.patch("/update-video/:videoId", updateVideo);
+router.patch("/update-video/:videoId", upload.single("thumbnail"), updateVideo);
 
 export default router;

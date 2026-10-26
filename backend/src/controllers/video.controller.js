@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { isValidObjectId } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -206,6 +207,7 @@ export const getAllVideos = asyncHandler(async (req, res) => {
 
 // update video details like title, description, thumbnail
 export const updateVideo = asyncHandler(async (req, res) => {
+  console.log(req.body);
   const { title, description } = req.body;
   const { videoId } = req.params;
 
