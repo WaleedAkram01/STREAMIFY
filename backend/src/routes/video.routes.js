@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   PublishAVideo,
   getAllVideos,
+  updateVideo,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 // Bilkul sahi naam jo aapne abhi dikhaya:
@@ -21,5 +22,7 @@ router.post(
   ]),
   PublishAVideo,
 );
+
+router.patch("/update-video/:videoId", updateVideo);
 
 export default router;
