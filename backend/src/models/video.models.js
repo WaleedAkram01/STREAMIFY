@@ -7,10 +7,24 @@ const videoSchema = new Schema(
       type: String, // Cloudinary ka secure URL
       required: [true, "Video file is required"], // Required lagana zaroori hai
     },
+    // thumbnail: {
+    //   type: String, // Cloudinary ka secure URL
+    //   required: [true, "Thumbnail is required"], // Required lagana zaroori hai
+    // },
+
     thumbnail: {
-      type: String, // Cloudinary ka secure URL
-      required: [true, "Thumbnail is required"], // Required lagana zaroori hai
+      url: {
+        type: String, // Cloudinary ka secure URL yahan save hoga
+        required: [true, "Thumbnail image URL is required"], // Custom message agar thumbnail URL missing ho
+        trim: true, // Agar link me koi space ho toh remove ho jaye
+      },
+      publicId: {
+        type: String,
+        required: [true, "Thumbnail public ID is required"], // Cloudinary ki public ID ke liye
+        trim: true,
+      },
     },
+
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

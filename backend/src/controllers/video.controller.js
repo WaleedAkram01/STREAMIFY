@@ -26,8 +26,8 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Description is strictly required");
   }
 
-  const videoFile = req.files?.video?.[0]; // Array tracking fixed
-  const thumbnailFile = req.files?.thumbnail?.[0]; // Array tracking fixed
+  const videoFile = req.files?.video?.[0];
+  const thumbnailFile = req.files?.thumbnail?.[0];
 
   if (!videoFile || !videoFile.buffer) {
     throw new ApiError(400, "Video file is required");
@@ -39,20 +39,22 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload video to cloud storage");
   }
 
-  // FIX HERE: Cloudinary eager response hamesha ek array hota hai, isliye indexing lagana lazmi hai
   const hlsStreamingUrl =
     videoUploadResult.eager && videoUploadResult.eager[0]
       ? videoUploadResult.eager[0].secure_url
       : videoUploadResult.secure_url;
 
   let finalThumbnailUrl = "";
+  let finalThumbnailPublicId = "";
 
   if (thumbnailFile && thumbnailFile.buffer) {
     const customThumbResult = await uploadImageBufferOnCloudinary(
       thumbnailFile.buffer,
     );
+
     if (customThumbResult) {
-      finalThumbnailUrl = customThumbResult.url;
+      finalThumbnailUrl = customThumbResult.secure_url;
+      finalThumbnailPublicId = customThumbResult.public_id;
     }
   }
 
@@ -61,20 +63,25 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
       /\.[^/.]+$/,
       ".jpg",
     );
+
+    finalThumbnailPublicId = videoUploadResult.public_id;
   }
 
   const rawSeconds = videoUploadResult.duration
     ? Number(videoUploadResult.duration)
     : 0;
+
   const formattedDurationText = formatDuration(rawSeconds);
 
-  // Database Document Creation
   const video = await Video.create({
     title,
     description,
-    videoFile: hlsStreamingUrl, // Mapping secure URL path
-    thumbnail: finalThumbnailUrl,
-    duration: formattedDurationText, // Saaf suthri "02:07" format text string save hogi
+    videoFile: hlsStreamingUrl,
+    thumbnail: {
+      url: finalThumbnailUrl,
+      publicId: finalThumbnailPublicId,
+    },
+    duration: formattedDurationText,
     isPublished: true,
     owner: req.user?._id,
   });

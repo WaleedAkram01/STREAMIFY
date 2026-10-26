@@ -621,6 +621,7 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         isSubscribed: {
           $cond: {
+            //If the current logged-in user(Yeh specifc id wala user) is in the subscribers list, then true, else false
             if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
             else: false,
@@ -661,13 +662,13 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
   // 1. Target the current logged-in user using aggregation pipeline
   const user = await User.aggregate([
     {
-      //  Match user document from req.user._id safely
+      // Match user document from req.user._id safely
       $match: {
         _id: new mongoose.Types.ObjectId(req.user?._id),
       },
     },
     {
-      //  Lookup details from videos collection using watchHistory IDs
+      // Lookup details from videos collection using watchHistory IDs
       $lookup: {
         from: "videos",
         localField: "watchHistory",
