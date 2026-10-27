@@ -4,6 +4,7 @@ import {
   getAllVideos,
   updateVideo,
   getVideoById,
+  togglePublishStatus,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 // Bilkul sahi naam jo aapne abhi dikhaya:
@@ -27,5 +28,7 @@ router.post(
 router.get("/get-video/:videoId", getVideoById);
 
 router.patch("/update-video/:videoId", upload.single("thumbnail"), updateVideo);
+
+router.patch("/toggle-publish/:videoId", togglePublishStatus);
 
 export default router;

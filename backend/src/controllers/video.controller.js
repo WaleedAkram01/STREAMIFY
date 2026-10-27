@@ -10,6 +10,8 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import { Video } from "../models/video.models.js";
+import { Comment } from "../models/comment.model.js";
+import { User } from "../models/user.models.js";
 
 // HELPER FUNCTION: Seconds ko "MM:SS" format mein convert karne ke liye
 const formatDuration = (totalSeconds) => {
@@ -17,92 +19,6 @@ const formatDuration = (totalSeconds) => {
   const seconds = Math.round(totalSeconds % 60);
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 };
-
-export const PublishAVideo = asyncHandler(async (req, res) => {
-  const { title, description } = req.body;
-
-  if (!title || title.trim() === "") {
-    throw new ApiError(400, "Video title is strictly required");
-  }
-
-  if (!description || description.trim() === "") {
-    throw new ApiError(400, "Description is strictly required");
-  }
-
-  const videoFile = req.files?.video?.[0];
-  const thumbnailFile = req.files?.thumbnail?.[0];
-
-  if (!videoFile || !videoFile.buffer) {
-    throw new ApiError(400, "Video file is required");
-  }
-
-  const videoUploadResult = await uploadVideoOnCloudinary(videoFile.buffer);
-
-  if (!videoUploadResult) {
-    throw new ApiError(500, "Failed to upload video to cloud storage");
-  }
-
-  const hlsStreamingUrl =
-    videoUploadResult.eager && videoUploadResult.eager[0]
-      ? videoUploadResult.eager[0].secure_url
-      : videoUploadResult.secure_url;
-
-  let finalThumbnailUrl = "";
-  let finalThumbnailPublicId = "";
-
-  if (thumbnailFile && thumbnailFile.buffer) {
-    const customThumbResult = await uploadImageBufferOnCloudinary(
-      thumbnailFile.buffer,
-    );
-
-    if (customThumbResult) {
-      finalThumbnailUrl = customThumbResult.secure_url;
-      finalThumbnailPublicId = customThumbResult.public_id;
-    }
-  }
-
-  if (!finalThumbnailUrl) {
-    finalThumbnailUrl = videoUploadResult.secure_url.replace(
-      /\.[^/.]+$/,
-      ".jpg",
-    );
-
-    finalThumbnailPublicId = videoUploadResult.public_id;
-  }
-
-  const rawSeconds = videoUploadResult.duration
-    ? Number(videoUploadResult.duration)
-    : 0;
-
-  const formattedDurationText = formatDuration(rawSeconds);
-
-  const video = await Video.create({
-    title,
-    description,
-    videoFile: hlsStreamingUrl,
-    thumbnail: {
-      url: finalThumbnailUrl,
-      publicId: finalThumbnailPublicId,
-    },
-    duration: formattedDurationText,
-    isPublished: true,
-    owner: req.user?._id,
-  });
-
-  if (!video) {
-    throw new ApiError(500, "Error while saving video document");
-  }
-
-  return res
-    .status(201)
-    .json(
-      new ApiResponse(
-        201,
-        video,
-        "Video published successfully with optimized streaming workflow!",
-      ),
-    );
-});
 
 // GET ALL VIDEOS CONTROLLER (Infinite Scroll & Search)
 export const getAllVideos = asyncHandler(async (req, res) => {
@@ -205,74 +121,90 @@ export const getAllVideos = asyncHandler(async (req, res) => {
   );
 });
 
-// update video details like title, description, thumbnail
-export const updateVideo = asyncHandler(async (req, res) => {
-  console.log(req.body);
+export const PublishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
-  const { videoId } = req.params;
 
-  if (!isValidObjectId(videoId)) {
-    throw new ApiError(400, "Invalid videoId");
+  if (!title || title.trim() === "") {
+    throw new ApiError(400, "Video title is strictly required");
   }
 
-  if (!(title && description)) {
-    throw new ApiError(400, "title and description are required");
+  if (!description || description.trim() === "") {
+    throw new ApiError(400, "Description is strictly required");
   }
 
-  const video = await Video.findById(videoId);
+  const videoFile = req.files?.video?.[0];
+  const thumbnailFile = req.files?.thumbnail?.[0];
+
+  if (!videoFile || !videoFile.buffer) {
+    throw new ApiError(400, "Video file is required");
+  }
+
+  const videoUploadResult = await uploadVideoOnCloudinary(videoFile.buffer);
+
+  if (!videoUploadResult) {
+    throw new ApiError(500, "Failed to upload video to cloud storage");
+  }
+
+  const hlsStreamingUrl =
+    videoUploadResult.eager && videoUploadResult.eager[0]
+      ? videoUploadResult.eager[0].secure_url
+      : videoUploadResult.secure_url;
+
+  let finalThumbnailUrl = "";
+  let finalThumbnailPublicId = "";
+
+  if (thumbnailFile && thumbnailFile.buffer) {
+    const customThumbResult = await uploadImageBufferOnCloudinary(
+      thumbnailFile.buffer,
+    );
+
+    if (customThumbResult) {
+      finalThumbnailUrl = customThumbResult.secure_url;
+      finalThumbnailPublicId = customThumbResult.public_id;
+    }
+  }
+
+  if (!finalThumbnailUrl) {
+    finalThumbnailUrl = videoUploadResult.secure_url.replace(
+      /\.[^/.]+$/,
+      ".jpg",
+    );
+
+    finalThumbnailPublicId = videoUploadResult.public_id;
+  }
+
+  const rawSeconds = videoUploadResult.duration
+    ? Number(videoUploadResult.duration)
+    : 0;
+
+  const formattedDurationText = formatDuration(rawSeconds);
+
+  const video = await Video.create({
+    title,
+    description,
+    videoFile: hlsStreamingUrl,
+    thumbnail: {
+      url: finalThumbnailUrl,
+      publicId: finalThumbnailPublicId,
+    },
+    duration: formattedDurationText,
+    isPublished: true,
+    owner: req.user?._id,
+  });
 
   if (!video) {
-    throw new ApiError(404, "No video found");
-  }
-
-  if (video?.owner.toString() !== req.user?._id.toString()) {
-    throw new ApiError(
-      400,
-      "You can't edit this video as you are not the owner",
-    );
-  }
-
-  //deleting old thumbnail and updating with new one
-  const thumbnailToDelete = video.thumbnail.public_id;
-
-  const thumbnailLocalPath = req.file?.path;
-
-  if (!thumbnailLocalPath) {
-    throw new ApiError(400, "thumbnail is required");
-  }
-
-  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-
-  if (!thumbnail) {
-    throw new ApiError(400, "thumbnail not found");
-  }
-
-  const updatedVideo = await Video.findByIdAndUpdate(
-    videoId,
-    {
-      $set: {
-        title,
-        description,
-        thumbnail: {
-          public_id: thumbnail.public_id,
-          url: thumbnail.url,
-        },
-      },
-    },
-    { new: true },
-  );
-
-  if (!updatedVideo) {
-    throw new ApiError(500, "Failed to update video please try again");
-  }
-
-  if (updatedVideo) {
-    await deleteFromCloudinary(thumbnailToDelete);
+    throw new ApiError(500, "Error while saving video document");
   }
 
   return res
-    .status(200)
-    .json(new ApiResponse(200, updatedVideo, "Video updated successfully"));
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        video,
+        "Video published successfully with optimized streaming workflow!",
+      ),
+    );
 });
 
 // GET VIDEO BY ID CONTROLLER (For Video Details Page)
@@ -402,4 +334,120 @@ export const getVideoById = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, video[0], "video details fetched successfully"));
+});
+
+// update video details like title, description, thumbnail
+export const updateVideo = asyncHandler(async (req, res) => {
+  console.log(req.body);
+  const { title, description } = req.body;
+  const { videoId } = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid videoId");
+  }
+
+  if (!(title && description)) {
+    throw new ApiError(400, "title and description are required");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "No video found");
+  }
+
+  if (video?.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(
+      400,
+      "You can't edit this video as you are not the owner",
+    );
+  }
+
+  //deleting old thumbnail and updating with new one
+  const thumbnailToDelete = video.thumbnail.public_id;
+
+  const thumbnailLocalPath = req.file?.path;
+
+  if (!thumbnailLocalPath) {
+    throw new ApiError(400, "thumbnail is required");
+  }
+
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  if (!thumbnail) {
+    throw new ApiError(400, "thumbnail not found");
+  }
+
+  const updatedVideo = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        title,
+        description,
+        thumbnail: {
+          public_id: thumbnail.public_id,
+          url: thumbnail.url,
+        },
+      },
+    },
+    { new: true },
+  );
+
+  if (!updatedVideo) {
+    throw new ApiError(500, "Failed to update video please try again");
+  }
+
+  if (updatedVideo) {
+    await deleteFromCloudinary(thumbnailToDelete);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedVideo, "Video updated successfully"));
+});
+
+// toggle publish status of a video
+export const togglePublishStatus = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid videoId");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (video?.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(
+      400,
+      "You can't toogle publish status as you are not the owner",
+    );
+  }
+
+  const toggledVideoPublish = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        isPublished: !video?.isPublished,
+      },
+    },
+    { new: true },
+  );
+
+  if (!toggledVideoPublish) {
+    throw new ApiError(500, "Failed to toogle video publish status");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { isPublished: toggledVideoPublish.isPublished },
+        "Video publish toggled successfully",
+      ),
+    );
 });
