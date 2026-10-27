@@ -481,7 +481,7 @@ export const deleteVideo = asyncHandler(async (req, res) => {
   }
 
   await deleteOnCloudinary(video.thumbnail.public_id); // video model has thumbnail public_id stored in it->check videoModel
-  await deleteOnCloudinary(video.videoFile.public_id, "video"); // specify video while deleting video
+  //   await deleteOnCloudinary(video.videoFile.public_id, "video"); // specify video while deleting video
 
   // delete video likes
   await Like.deleteMany({
