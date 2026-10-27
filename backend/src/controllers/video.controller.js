@@ -454,7 +454,7 @@ export const togglePublishStatus = asyncHandler(async (req, res) => {
 
 // delete video
 // One thing I missed here is video deletion from cloudianry that is missed
-const deleteVideo = asyncHandler(async (req, res) => {
+export const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
   if (!isValidObjectId(videoId)) {
