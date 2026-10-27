@@ -3,6 +3,7 @@ import {
   PublishAVideo,
   getAllVideos,
   updateVideo,
+  getVideoById,
 } from "../controllers/video.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 // Bilkul sahi naam jo aapne abhi dikhaya:
@@ -22,6 +23,8 @@ router.post(
   ]),
   PublishAVideo,
 );
+
+router.get("/get-video/:videoId", getVideoById);
 
 router.patch("/update-video/:videoId", upload.single("thumbnail"), updateVideo);
 
