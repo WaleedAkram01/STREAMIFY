@@ -110,6 +110,22 @@ export const upadtePlaylist = createAsyncThunk(
     }
 );
 
+export const deletePlaylist = createAsyncThunk(
+    "deletePlaylist",
+    async (playlistId) => {
+        try {
+            const response = await axiosInstance.delete(
+                `/playlists/${playlistId}`
+            );
+            toast.success(response.data?.message);
+            return playlistId;
+        } catch (error) {
+            toast.error(error?.response?.data?.error);
+            throw error;
+        }
+    }
+);
+
 const playlistSlice = createSlice({
     name: "playlist",
     initialState,
@@ -117,6 +133,40 @@ const playlistSlice = createSlice({
     extraReducers: (builder) => {
         builder.addCase(getPlaylistsByUser.fulfilled, (state, action) => {
             state.playlists = action.payload;
+        });
+        // Nayi playlist foran list mein dikhe
+        builder.addCase(createAPlaylist.fulfilled, (state, action) => {
+            state.playlists.unshift({
+                ...action.payload,
+                totalVideos: 0,
+                totalViews: 0,
+            });
+        });
+        builder.addCase(getPlaylistById.pending, (state) => {
+            state.loading = true;
+            state.playlist = null;
+        });
+        builder.addCase(getPlaylistById.fulfilled, (state, action) => {
+            state.loading = false;
+            state.playlist = action.payload;
+        });
+        builder.addCase(getPlaylistById.rejected, (state) => {
+            state.loading = false;
+        });
+        // Playlist page se video hatao (dobara fetch ki zaroorat nahi)
+        builder.addCase(removeVideoFromPlaylist.fulfilled, (state, action) => {
+            const { videoId } = action.meta.arg;
+            if (state.playlist?.videos) {
+                state.playlist.videos = state.playlist.videos.filter(
+                    (video) => video._id !== videoId
+                );
+                state.playlist.totalVideos = state.playlist.videos.length;
+            }
+        });
+        builder.addCase(deletePlaylist.fulfilled, (state, action) => {
+            state.playlists = state.playlists.filter(
+                (playlist) => playlist._id !== action.payload
+            );
         });
     },
 });

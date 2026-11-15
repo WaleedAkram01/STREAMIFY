@@ -41,6 +41,14 @@ const userSlice = createSlice({
     extraReducers: (builder) => {
         builder.addCase(userChannelProfile.pending, (state) => {
             state.loading = true;
+            // Purane channel ka data na dikhe jab naya channel load ho raha ho
+            state.profileData = null;
+        });
+        builder.addCase(userChannelProfile.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(getWatchHistory.rejected, (state) => {
+            state.loading = false;
         });
         builder.addCase(userChannelProfile.fulfilled, (state, action) => {
             state.loading = false;

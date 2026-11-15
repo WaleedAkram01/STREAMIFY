@@ -2,7 +2,7 @@ import React from "react";
 import { Logo, Button, Input } from "./index";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser, userLogin } from "../store/Slices/authSlice.js";
+import { userLogin } from "../store/Slices/authSlice.js";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import LoginSkeleton from "../skeleton/loginSkeleton.jsx";
@@ -23,9 +23,9 @@ function Login() {
             ? { email: data.username, password: data.password }
             : data;
 
+        // userLogin khud user data store mein rakh deta hai, alag getCurrentUser call ki zaroorat nahi
         const response = await dispatch(userLogin(loginData));
-        const user = await dispatch(getCurrentUser());
-        if (user && response?.payload) {
+        if (response?.type === "login/fulfilled") {
             navigate("/");
         }
     };
@@ -68,8 +68,18 @@ function Login() {
                             })}
                         />
                         {errors.password && (
-                            <span>{errors.password.message}</span>
+                            <span className="text-red-500">
+                                {errors.password.message}
+                            </span>
                         )}
+                        <div className="text-right text-sm">
+                            <Link
+                                to="/forgot-password"
+                                className="text-purple-600 hover:opacity-70"
+                            >
+                                Forgot password?
+                            </Link>
+                        </div>
 
                         <Button
                             type="submit"

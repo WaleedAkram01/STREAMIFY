@@ -56,6 +56,7 @@ function SignUp() {
                                 <GetImagePreview
                                     name="coverImage"
                                     control={control}
+                                    required={false}
                                     className="w-full h-28 object-cover border-none border-slate-900"
                                     cameraIcon
                                 />
@@ -158,6 +159,11 @@ function SignUp() {
                             placeholder="Enter password"
                             {...register("password", {
                                 required: "password is required",
+                                minLength: {
+                                    value: 8,
+                                    message:
+                                        "Password must be at least 8 characters long",
+                                },
                             })}
                             className="h-8"
                         />

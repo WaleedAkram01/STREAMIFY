@@ -38,11 +38,9 @@ function AdminDashboard() {
         }));
     };
 
+    // Upload / toggle / delete ke baad stats aur videos dono dobara load hon
     useEffect(() => {
         dispatch(getChannelStats());
-    }, [dispatch]);
-
-    useEffect(() => {
         dispatch(getChannelVideos());
     }, [dispatch, uploaded, publishToggled, deleting]);
 
@@ -65,6 +63,7 @@ function AdminDashboard() {
                                 setEditVideoPopup={setPopUp}
                                 title={videoDetails?.title}
                                 description={videoDetails?.description}
+                                thumbnail={videoDetails?.thumbnail?.url}
                                 videoId={videoDetails?._id}
                             />
                         </div>

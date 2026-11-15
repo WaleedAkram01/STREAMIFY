@@ -77,6 +77,9 @@ const tweetSlice = createSlice({
             state.loading = false;
             state.tweets = action.payload;
         });
+        builder.addCase(getUserTweets.rejected, (state) => {
+            state.loading = false;
+        });
         builder.addCase(createTweet.fulfilled, (state, action) => {
             state.tweets.unshift(action.payload);
         })

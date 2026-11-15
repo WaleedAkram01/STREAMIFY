@@ -10,7 +10,8 @@ function GetImagePreview({
     className,
     cameraIcon = false,
     cameraSize = 20,
-    image
+    image,
+    required = true,
 }) {
     const [preview, setPreview] = useState(null);
 
@@ -58,7 +59,7 @@ function GetImagePreview({
                                 }}
                             />
                         )}
-                        rules={{ required: `${name} is required` }}
+                        rules={required ? { required: `${name} is required` } : {}}
                     />
                 </label>
             </div>

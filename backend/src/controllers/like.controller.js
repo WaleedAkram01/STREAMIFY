@@ -1,5 +1,8 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Like } from "../models/like.model.js";
+import { Video } from "../models/video.models.js";
+import { Comment } from "../models/comment.model.js";
+import { Tweet } from "../models/tweet.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -22,6 +25,12 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     return res
       .status(200)
       .json(new ApiResponse(200, { isLiked: false }, "Like removed"));
+  }
+
+  // Naya like sirf maujood video par (deleted/galat id par junk like na bane)
+  const target = await Video.findById(videoId).select("_id isPublished owner");
+  if (!target || (!target.isPublished && target.owner?.toString() !== req.user?._id.toString())) {
+    throw new ApiError(404, "Video not found");
   }
 
   await Like.create({
@@ -54,6 +63,12 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, { isLiked: false }, "Like removed"));
   }
 
+  // Naya like sirf maujood comment par (deleted/galat id par junk like na bane)
+  const target = await Comment.findById(commentId).select("_id");
+  if (!target) {
+    throw new ApiError(404, "Comment not found");
+  }
+
   await Like.create({
     comment: commentId,
     likedBy: req.user?._id,
@@ -84,6 +99,12 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, { isLiked: false }, "Like removed"));
   }
 
+  // Naya like sirf maujood tweet par (deleted/galat id par junk like na bane)
+  const target = await Tweet.findById(tweetId).select("_id");
+  if (!target) {
+    throw new ApiError(404, "Tweet not found");
+  }
+
   await Like.create({
     tweet: tweetId,
     likedBy: req.user?._id,
@@ -108,6 +129,15 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         foreignField: "_id",
         as: "likedVideo",
         pipeline: [
+          // Doosron ki unpublished videos list mein na aayen (apni aa sakti hain)
+          {
+            $match: {
+              $or: [
+                { isPublished: true },
+                { owner: new mongoose.Types.ObjectId(req.user?._id) },
+              ],
+            },
+          },
           {
             $lookup: {
               from: "users",

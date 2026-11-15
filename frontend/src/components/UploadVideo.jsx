@@ -85,8 +85,8 @@ function UploadVideo({ setUploadVideoPopup }) {
                                         Drag and drop video files to upload{" "}
                                     </h1>
                                     <p className="font-light text-xs">
-                                        Your videos will be private untill you
-                                        publish them.
+                                        Your video will be published right
+                                        away (max 100MB).
                                     </p>
                                 </div>
                                 <label
@@ -123,7 +123,8 @@ function UploadVideo({ setUploadVideoPopup }) {
                                     <GetImagePreview
                                         name="thumbnail"
                                         control={control}
-                                        label="Thumbnail *"
+                                        label="Thumbnail (optional, auto-generated if empty)"
+                                        required={false}
                                         className={
                                             "w-full h-56 border object-contain"
                                         }

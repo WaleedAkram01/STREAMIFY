@@ -11,6 +11,8 @@ function ChannelVideos() {
     const [activeButton, setActiveButton] = useState("button1");
 
     useEffect(() => {
+        // userId ke baghair request saari videos le aati thi (doosre channels ki bhi)
+        if (!userId) return;
         const sortBy = searchParams?.sortBy;
         const sortType = searchParams?.sortType;
         dispatch(getAllVideos({ userId, sortBy, sortType }));

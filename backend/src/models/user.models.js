@@ -3,6 +3,7 @@ import { Schema } from "mongoose";
 import { Video } from "./video.models.js";
 import bcrypt from "bcrypt"; // Password hashing ke liy
 import jwt from "jsonwebtoken"; // JWT token generate karne ke liye
+import crypto from "crypto"; // OTP generate aur hash karne ke liye
 
 const userSchema = new Schema(
   {
@@ -67,7 +68,7 @@ const userSchema = new Schema(
       required: [true, "Password is required"],
     },
     forgotPasswordOTP: {
-      type: Number, // 6 digit ka number save karne ke liye
+      type: String, // 6 digit OTP ka sha256 hash
       default: undefined,
     },
     forgotPasswordOTPExpiry: {
@@ -129,13 +130,17 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
+// OTP ko sha256 hash mein badalna (save aur match dono isi se hote hain)
+export const hashOTP = (otp) =>
+  crypto.createHash("sha256").update(String(otp).trim()).digest("hex");
+
 // 5. Method: Forgot Password OTP Generate Karna
 userSchema.methods.generateForgotPasswordOTP = function () {
-  // 100000 se 999999 ke beech aik random 6 digit number generate karein
-  const otp = Math.floor(100000 + Math.random() * 900000);
+  // 100000 se 999999 ke beech aik random 6 digit number (crypto = guess karna mushkil)
+  const otp = crypto.randomInt(100000, 1000000);
 
-  // Database mein directly save karne ke liye assign karein
-  this.forgotPasswordOTP = otp;
+  // DB mein OTP ka hash save hota hai (DB leak ho to bhi OTP pata na chale)
+  this.forgotPasswordOTP = hashOTP(otp);
 
   // OTP ki expiry kam rakhein (e.g., 5 minutes) kyunki OTP jaldi expire hona chahiye
   this.forgotPasswordOTPExpiry = Date.now() + 5 * 60 * 1000;

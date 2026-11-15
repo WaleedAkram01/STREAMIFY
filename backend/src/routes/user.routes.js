@@ -24,8 +24,27 @@ const router = Router();
 const resetPasswordLimiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes
   max: 5,
-  message:
-    "Too many reset attempts from this IP, please try again after 2 minutes.",
+  message: {
+    statusCode: 429,
+    success: false,
+    message:
+      "Too many reset attempts from this IP, please try again after 2 minutes.",
+    errors: [],
+    data: null,
+  },
+});
+
+// Ek IP 15 minutes mein sirf 5 OTP emails mangwa sakti hai (email spam se bachao)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: {
+    statusCode: 429,
+    success: false,
+    message: "Too many OTP requests, please try again after 15 minutes.",
+    errors: [],
+    data: null,
+  },
 });
 
 // AUTH ROUTES
@@ -49,7 +68,7 @@ router.post("/refresh-token", refreshAccessToken);
 //  6- Change Current Password
 router.post("/change-password", verifyJWT, changeCurrentPassword);
 // 7- Forgot Password
-router.post("/forgot-password", forgotPasswordSendOTP);
+router.post("/forgot-password", forgotPasswordLimiter, forgotPasswordSendOTP);
 // 8- Reset Password with OTP
 router.post("/reset-password", resetPasswordLimiter, resetPasswordWithOTP);
 // 9- Update Account Details

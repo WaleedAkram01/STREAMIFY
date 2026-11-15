@@ -44,7 +44,9 @@ function EditAvatar({ cover, preImage }) {
                     <div className="fixed z-50 top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-70">
                         <div className="bg-black p-8 relative border shadow-lg w-full max-w-md">
                             {/* Close button */}
+                            {/* type="button" zaroori hai, warna form ke andar yeh submit kar deta tha */}
                             <button
+                                type="button"
                                 className="absolute top-5 right-5 text-white hover:text-gray-200"
                                 onClick={() => setIsOpen(false)}
                             >

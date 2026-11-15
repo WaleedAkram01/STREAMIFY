@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import { AuthLayout, Login, SignUp } from "./components/index";
+import ForgotPassword from "./components/ForgotPassword";
 import { Toaster } from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { getCurrentUser } from "./store/Slices/authSlice";
@@ -19,6 +20,7 @@ import {
     SearchVideos,
     TermsAndConditions,
     ChannelPlaylist,
+    PlaylistDetail,
 } from "./pages";
 import { EditPersonalInfo, ChangePassword, Layout } from "./components";
 
@@ -94,6 +96,14 @@ function App() {
                         />
                     </Route>
                     <Route
+                        path="/playlist/:playlistId"
+                        element={
+                            <AuthLayout authentication>
+                                <PlaylistDetail />
+                            </AuthLayout>
+                        }
+                    />
+                    <Route
                         path="/history"
                         element={
                             <AuthLayout authentication>
@@ -148,6 +158,14 @@ function App() {
                     element={
                         <AuthLayout authentication={false}>
                             <Login />
+                        </AuthLayout>
+                    }
+                />
+                <Route
+                    path="/forgot-password"
+                    element={
+                        <AuthLayout authentication={false}>
+                            <ForgotPassword />
                         </AuthLayout>
                     }
                 />

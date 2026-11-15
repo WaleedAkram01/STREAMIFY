@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { User } from "../models/user.models.js";
+import { User, hashOTP } from "../models/user.models.js";
 import {
   uploadOnCloudinary,
   deleteFromCloudinary,
@@ -28,6 +28,17 @@ const generateAccessAndRefreshTokens = async (userId) => {
   }
 };
 
+// Password rule aik jagah (register, change aur reset teeno yahi use karte hain)
+const MIN_PASSWORD_LENGTH = 8;
+const checkPasswordLength = (password) => {
+  if (String(password).length < MIN_PASSWORD_LENGTH) {
+    throw new ApiError(
+      400,
+      `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`,
+    );
+  }
+};
+
 // 1-REGISTER USER CONTROLLER
 export const registerUser = asyncHandler(async (req, res) => {
   // 1. Frontend se data receive karna (req.body)
@@ -43,10 +54,22 @@ export const registerUser = asyncHandler(async (req, res) => {
     );
   }
 
+  checkPasswordLength(password);
+
   // 3. Check karna ke user pehle se register toh nahi hai (by email ya username)
   // Schema lowercase karke save karta hai, isliye search bhi lowercase mein
   const normalizedUsername = username.toLowerCase().trim();
   const normalizedEmail = email.toLowerCase().trim();
+
+  // Schema rules (email/username/fullName format) upload se PEHLE check karein,
+  // warna galat data par bhi images Cloudinary par upload ho kar wahin reh jati thin
+  await new User({
+    fullName,
+    email: normalizedEmail,
+    username: normalizedUsername,
+    password,
+    avatar: { url: "pending", publicId: "pending" },
+  }).validate();
 
   const existedUser = await User.findOne({
     $or: [{ username: normalizedUsername }, { email: normalizedEmail }],
@@ -270,6 +293,8 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Both old password and new password are required");
   }
 
+  checkPasswordLength(newPassword);
+
   // 2. Database se user dhoondo password field ke saath
   // (Kyunki humne verifyJWT me password select("-password") kiya tha, tou yahan explicitly password mangwana parega)
   const user = await User.findById(req.user?._id).select("+password");
@@ -290,9 +315,17 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
   user.password = newPassword;
   await user.save({ validateBeforeSave: false }); // pre-save hook chalega aur password hash ho jayega
 
-  // 5. Clean response return karo
+  // 5. Naye tokens: DB ka refresh token badal jata hai, is liye doosre devices ke
+  // purane logins khatam ho jate hain, lekin yeh session chalta rehta hai
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id,
+  );
+
+  // 6. Clean response return karo
   return res
     .status(200)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
     .json(new ApiResponse(200, {}, "Password changed successfully! 🔐"));
 });
 
@@ -355,7 +388,8 @@ export const forgotPasswordSendOTP = asyncHandler(async (req, res) => {
         new ApiResponse(
           200,
           {},
-          "Verification OTP has been sent to your email address.",
+          // Same message jo unknown email par jata hai (koi email registered hai ya nahi, pata na chale)
+          "If this email is registered, a password reset OTP has been sent.",
         ),
       );
   } catch (error) {
@@ -383,10 +417,12 @@ export const resetPasswordWithOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Passwords do not match.");
   }
 
+  checkPasswordLength(password);
+
   // User ko email, OTP, aur expiry ke sath search karein
   const user = await User.findOne({
     email: email?.toLowerCase().trim(),
-    forgotPasswordOTP: String(otp).trim(), // Body se string ata hai, isay string format mein clean match karein
+    forgotPasswordOTP: hashOTP(otp), // DB mein hash save hai, isliye hash se match
     forgotPasswordOTPExpiry: { $gt: Date.now() }, // Check karein ke expired na ho
   });
 
@@ -403,6 +439,8 @@ export const resetPasswordWithOTP = asyncHandler(async (req, res) => {
   // Kaam khatam hone ke baad OTP fields ko database se saaf (clean) kar dein
   user.forgotPasswordOTP = undefined;
   user.forgotPasswordOTPExpiry = undefined;
+  // Password reset ke baad har device se logout (purana refresh token kaam nahi karega)
+  user.refreshToken = undefined;
 
   await user.save();
 
@@ -663,6 +701,15 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
         as: "watchHistory",
         pipeline: [
           {
+            // Doosron ki unpublished videos history mein na dikhen
+            $match: {
+              $or: [
+                { isPublished: true },
+                { owner: new mongoose.Types.ObjectId(req.user?._id) },
+              ],
+            },
+          },
+          {
             // Sub-pipeline to look up video owner profile metadata from users collection
             $lookup: {
               from: "users",
@@ -675,7 +722,7 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
                   $project: {
                     fullName: 1,
                     username: 1,
-                    avatar: 1, // Passes through the complete structured { url, publicId } object safely
+                    "avatar.url": 1, // sirf URL (publicId andar ki cheez hai)
                   },
                 },
               ],

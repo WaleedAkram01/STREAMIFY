@@ -7,6 +7,16 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from "../utils/constants.js";
 
+// Video exist kare aur dekhne layak ho (unpublished video sirf owner ke liye)
+const findVisibleVideo = async (videoId, userId) => {
+  const video = await Video.findById(videoId);
+  const isOwner = video?.owner?.toString() === userId?.toString();
+  if (!video || (!video.isPublished && !isOwner)) {
+    throw new ApiError(404, "Video not found");
+  }
+  return video;
+};
+
 // 1-GET VIDEO COMMENTS CONTROLLER (paginated)
 const getVideoComments = asyncHandler(async (req, res) => {
   // 1. Input nikalna
@@ -19,10 +29,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
   }
 
   // 3. Video exist karti hai?
-  const video = await Video.findById(videoId);
-  if (!video) {
-    throw new ApiError(404, "Video not found");
-  }
+  await findVisibleVideo(videoId, req.user?._id);
 
   // 4. Aggregation: owner + likes count + isLiked
   const commentsAggregate = Comment.aggregate([
@@ -115,10 +122,7 @@ const addComment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid videoId");
   }
 
-  const video = await Video.findById(videoId);
-  if (!video) {
-    throw new ApiError(404, "Video not found");
-  }
+  await findVisibleVideo(videoId, req.user?._id);
 
   const comment = await Comment.create({
     content: content.trim(),

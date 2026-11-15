@@ -84,7 +84,8 @@ function EditVideo({
                             <GetImagePreview
                                 name={"thumbnail"}
                                 control={control}
-                                label={"Thumbnail: "}
+                                label={"Thumbnail (optional): "}
+                                required={false}
                                 cameraIcon
                                 cameraSize={30}
                                 className={

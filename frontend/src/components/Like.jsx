@@ -12,23 +12,22 @@ function Like({ isLiked, likesCount = 0, tweetId, commentId, videoId, size }) {
     const [localIsLiked, setLocalIsLiked] = useState(isLiked);
     const [localLikesCount, setLocalLikesCount] = useState(likesCount);
 
-    const handleLikeToggle = () => {
-        if (localIsLiked) {
-            setLocalLikesCount((prev) => prev - 1);
-        } else {
-            setLocalLikesCount((prev) => prev + 1);
-        }
+    const handleLikeToggle = async () => {
+        // Pehle UI update (fast feel), API fail ho to wapas purani state
+        const wasLiked = localIsLiked;
+        setLocalLikesCount((prev) => prev + (wasLiked ? -1 : 1));
+        setLocalIsLiked(!wasLiked);
 
-        setLocalIsLiked((prev) => !prev);
+        let action;
+        if (tweetId) action = toggleTweetLike(tweetId);
+        else if (commentId) action = toggleCommentLike(commentId);
+        else if (videoId) action = toggleVideoLike(videoId);
+        if (!action) return;
 
-        if (tweetId) {
-            dispatch(toggleTweetLike(tweetId));
-        }
-        if (commentId) {
-            dispatch(toggleCommentLike(commentId));
-        }
-        if (videoId) {
-            dispatch(toggleVideoLike(videoId));
+        const result = await dispatch(action);
+        if (result?.error) {
+            setLocalLikesCount((prev) => prev + (wasLiked ? 1 : -1));
+            setLocalIsLiked(wasLiked);
         }
     };
     useEffect(() => {

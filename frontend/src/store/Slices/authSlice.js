@@ -151,6 +151,19 @@ const authSlice = createSlice({
         builder.addCase(createAccount.fulfilled, (state) => {
             state.loading = false;
         });
+        // rejected cases zaroori hain warna error ke baad loading skeleton par page atak jata hai
+        builder.addCase(createAccount.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(userLogin.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(userLogout.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(updateUserDetails.rejected, (state) => {
+            state.loading = false;
+        });
         builder.addCase(userLogin.pending, (state) => {
             state.loading = true;
         });

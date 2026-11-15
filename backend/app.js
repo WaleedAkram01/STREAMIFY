@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import multer from "multer";
+import fs from "fs";
 import { ApiError } from "./src/utils/ApiError.js";
 
 // Routes import
@@ -40,6 +41,16 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
+// Hamari saari APIs body mein sirf simple values (string/number/boolean) leti hain.
+// Object/array aaye to reject: NoSQL injection ({ "$gt": "" }) aur .trim() crash dono se bachao
+app.use((req, res, next) => {
+  const values = Object.values(req.body || {});
+  if (values.some((value) => value !== null && typeof value === "object")) {
+    return next(new ApiError(400, "Invalid input: nested objects are not allowed"));
+  }
+  next();
+});
+
 // API ROUTES
 app.use("/api/v1/healthcheck", healthcheckRoutes);
 app.use("/api/v1/users", userRoutes);
@@ -64,6 +75,15 @@ app.use((req, res, next) => {
 // Global error handler (hamesha sab se aakhir mein)
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  // Request fail hui to multer ki temp files (public/temp) delete kar do
+  const uploadedFiles = [
+    req.file,
+    ...Object.values(req.files || {}).flat(),
+  ].filter((file) => file?.path);
+  for (const file of uploadedFiles) {
+    fs.unlink(file.path, () => {});
+  }
+
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal Server Error";
   let errors = err.errors || [];

@@ -14,7 +14,7 @@ function CommentsList({
     isLiked,
     likesCount,
 }) {
-    const avatar2 = useSelector((state) => state.auth?.userData?.avatar.url);
+    const avatar2 = useSelector((state) => state.auth?.userData?.avatar?.url);
     const authUsername = useSelector((state) => state.auth?.userData?.username);
     const dispatch = useDispatch();
 
@@ -25,13 +25,16 @@ function CommentsList({
         delete: false,
     });
 
-    const handleEditComment = (editedContent) => {
-        console.log(editedContent);
-        dispatch(editAComment({ commentId, content: editedContent }));
+    const handleEditComment = async (editedContent) => {
+        const result = await dispatch(
+            editAComment({ commentId, content: editedContent })
+        );
+        // Sirf kamyab edit par naya text dikhao (fail ho to purana hi rahe)
+        const saved = result?.type === "editAComment/fulfilled";
         setEditState((prevState) => ({
             ...prevState,
-            editing: false,
-            editedContent,
+            editing: !saved,
+            editedContent: saved ? result.payload?.content : prevState.editedContent,
             isOpen: false,
             delete: false,
         }));

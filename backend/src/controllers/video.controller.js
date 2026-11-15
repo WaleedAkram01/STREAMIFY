@@ -170,9 +170,9 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload video to cloud storage");
   }
 
-  // eager_async mein eager[0].secure_url foran nahi milta, isliye fallback zaroori hai
-  const hlsStreamingUrl =
-    videoUploadResult.eager?.[0]?.secure_url || videoUploadResult.secure_url;
+  // Original video ka URL save karte hain: yeh upload ke foran baad chal jata hai.
+  // (Async HLS .m3u8 Cloudinary baad mein banata hai, us se pehle video play nahi hoti thi)
+  const videoUrl = videoUploadResult.secure_url;
 
   let finalThumbnailUrl = "";
   let finalThumbnailPublicId = "";
@@ -206,7 +206,7 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
   const video = await Video.create({
     title: title.trim(),
     description: description.trim(),
-    videoFile: hlsStreamingUrl,
+    videoFile: videoUrl,
     videoPublicId: videoUploadResult.public_id,
     thumbnail: {
       url: finalThumbnailUrl,
@@ -227,7 +227,7 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
       new ApiResponse(
         201,
         video,
-        "Video published successfully with optimized streaming workflow!",
+        "Video published successfully!",
       ),
     );
 });

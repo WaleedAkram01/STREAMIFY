@@ -213,6 +213,13 @@ const videoSlice = createSlice({
         builder.addCase(deleteAVideo.fulfilled, (state) => {
             state.loading = false;
         });
+        builder.addCase(deleteAVideo.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(getVideoById.rejected, (state) => {
+            state.loading = false;
+            state.video = null;
+        });
         builder.addCase(getVideoById.pending, (state) => {
             state.loading = true;
         });

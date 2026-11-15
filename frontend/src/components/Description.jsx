@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { timeAgo } from "../helpers/timeAgo";
 import { Like, Button } from "./index";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { toggleSubscription } from "../store/Slices/subscriptionSlice";
+import SaveToPlaylist from "./SaveToPlaylist";
 
 function Description({
     title,
@@ -22,6 +23,7 @@ function Description({
     const [localIsSubscribed, setLocalIsSubscribed] = useState(isSubscribed);
     const [localSubscribersCount, setLocalSubscribersCount] = useState(subscribersCount);
     const dispatch = useDispatch();
+    const currentUserId = useSelector((state) => state.auth?.userData?._id);
 
     const handleSubscribe = () => {
         dispatch(toggleSubscription(channelId));
@@ -33,7 +35,6 @@ function Description({
         }
     };
 
-    const handleSubsribe = () => {};
     return (
         <>
             <section className="sm:max-w-4xl w-full text-white sm:p-5 p-2 space-y-2">
@@ -57,6 +58,7 @@ function Description({
                                     size={25}
                                 />
                             </div>
+                            {videoId && <SaveToPlaylist videoId={videoId} />}
                         </div>
                         <div className="flex gap-2 justify-between items-center">
                             <Link
@@ -76,7 +78,8 @@ function Description({
                                     </p>
                                 </div>
                             </Link>
-                            <div onClick={handleSubsribe}>
+                            {/* Apne channel ko subscribe nahi kar sakte, isliye button sirf doosron ke liye */}
+                            {channelId && channelId !== currentUserId && (
                                 <Button
                                     onClick={handleSubscribe}
                                     className="border-slate-500 hover:scale-110 transition-all text-black font-bold px-4 py-1 bg-purple-500"
@@ -85,7 +88,7 @@ function Description({
                                         ? "Subscribed"
                                         : "Subscribe"}
                                 </Button>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

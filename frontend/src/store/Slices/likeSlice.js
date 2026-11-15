@@ -74,6 +74,9 @@ const likeSlice = createSlice({
             state.loading = false;
             state.likedVideos = action.payload;
         });
+        builder.addCase(getLikedVideos.rejected, (state) => {
+            state.loading = false;
+        });
 
     },
 });

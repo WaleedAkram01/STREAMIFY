@@ -28,6 +28,7 @@ function VideoDetail() {
 
     useEffect(() => {
         if (videoId) {
+            setPage(1); // nayi video par comments page 1 se
             dispatch(getVideoById({ videoId }));
             dispatch(getVideoComments({ videoId }));
         }
@@ -50,7 +51,7 @@ function VideoDetail() {
                 poster={video?.thumbnail?.url}
             />
             <Description
-                avatar={video?.owner?.avatar.url}
+                avatar={video?.owner?.avatar?.url}
                 channelName={video?.owner?.username}
                 createdAt={video?.createdAt}
                 description={video?.description}

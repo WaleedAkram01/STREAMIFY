@@ -78,11 +78,19 @@ const subscriptionSlice = createSlice({
         builder.addCase(getSubscribedChannels.pending, (state) => {
             state.loading = true;
         });
+        // Saare subscribed channels rakho (jin ki video nahi, unka avatar bhi dikhe)
         builder.addCase(getSubscribedChannels.fulfilled, (state, action) => {
             state.loading = false;
-            state.mySubscriptions = action.payload.filter(
-                (subscription) => subscription?.subscribedChannel?.latestVideo
-            );
+            state.mySubscriptions = action.payload;
+        });
+        builder.addCase(toggleSubscription.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(getUserChannelSubscribers.rejected, (state) => {
+            state.loading = false;
+        });
+        builder.addCase(getSubscribedChannels.rejected, (state) => {
+            state.loading = false;
         });
     },
 });

@@ -68,6 +68,7 @@ function SearchVideos() {
                                 onClick={() => setFilterOpen((prev) => !prev)}
                             />
                             <table className="mt-4">
+                                <tbody>
                                 <tr className="w-full text-start border-b">
                                     <th>SortBy</th>
                                 </tr>
@@ -136,6 +137,7 @@ function SearchVideos() {
                                         </span>
                                     </td>
                                 </tr>
+                            </tbody>
                             </table>
                         </div>
                     </div>

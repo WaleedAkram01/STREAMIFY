@@ -57,7 +57,6 @@ export const deleteAComment = createAsyncThunk(
                 `/comments/c/${commentId}`
             );
             toast.success(response.data.message);
-            console.log(response.data.data);
             return response.data.data;
         } catch (error) {
             toast.error(error?.response?.data?.error);
@@ -89,6 +88,8 @@ const commentSlice = createSlice({
     reducers: {
         cleanUpComments: (state) => {
             state.comments = [];
+            state.totalComments = null;
+            state.hasNextPage = false;
         },
     },
     extraReducers: (builder) => {
@@ -100,6 +101,9 @@ const commentSlice = createSlice({
             state.comments = [...state.comments, ...action.payload.docs];
             state.totalComments = action.payload.totalDocs;
             state.hasNextPage = action.payload.hasNextPage;
+        });
+        builder.addCase(getVideoComments.rejected, (state) => {
+            state.loading = false;
         });
         builder.addCase(createAComment.fulfilled, (state, action) => {
             state.comments.unshift(action.payload);

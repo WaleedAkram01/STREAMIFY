@@ -11,7 +11,7 @@ function MySubscriptions() {
     );
     const subscriberId = useSelector((state) => state.auth?.userData?._id);
     useEffect(() => {
-        if (subscriptions) {
+        if (subscriberId) {
             dispatch(getSubscribedChannels(subscriberId));
         }
     }, [dispatch, subscriberId]);
@@ -26,7 +26,7 @@ function MySubscriptions() {
                         className="flex flex-col items-center overflow-x-scroll"
                     >
                         <Avatar
-                            src={subscription?.subscribedChannel?.avatar.url}
+                            src={subscription?.subscribedChannel?.avatar?.url}
                             channelName={
                                 subscription?.subscribedChannel?.username
                             }
@@ -39,7 +39,10 @@ function MySubscriptions() {
             </div>
 
             <div className="text-white mb-20 sm:mb-0 w-full grid xl:grid-cols-3 sm:grid-cols-2 grid-cols-1 overflow-y-scroll">
-                {subscriptions?.map((subscription) => (
+                {/* Video grid sirf un channels ka jin ki koi published video hai */}
+                {subscriptions
+                    ?.filter((subscription) => subscription?.subscribedChannel?.latestVideo)
+                    .map((subscription) => (
                     <Link
                         to={`/watch/${subscription?.subscribedChannel?.latestVideo?._id}`}
                         key={subscription?.subscribedChannel?._id}
@@ -48,7 +51,7 @@ function MySubscriptions() {
                             <VideoList
                                 key={subscription?.subscribedChannel?._id}
                                 avatar={
-                                    subscription?.subscribedChannel?.avatar.url
+                                    subscription?.subscribedChannel?.avatar?.url
                                 }
                                 duration={
                                     subscription?.subscribedChannel?.latestVideo

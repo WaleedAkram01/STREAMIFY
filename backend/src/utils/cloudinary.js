@@ -38,8 +38,6 @@ export const uploadVideoOnCloudinary = (fileBuffer) => {
       {
         resource_type: "video",
         chunk_size: 6000000, // 6MB chunks background pipeline
-        eager: [{ streaming_profile: "hd", format: "m3u8" }], // Auto HLS format
-        eager_async: true, // Async background conversion
       },
       (error, result) => {
         if (error) return reject(error);

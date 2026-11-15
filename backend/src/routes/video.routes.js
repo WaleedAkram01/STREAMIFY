@@ -13,9 +13,11 @@ import { uploadVideoFields, upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
-router.use(verifyJWT);
-
+// Public: home aur search page logged-out visitors ko bhi videos dikhate hain
 router.get("/get-all", getAllVideos);
+
+// Baaki sab routes ke liye login zaroori
+router.use(verifyJWT);
 
 router.post(
   "/publish-video",

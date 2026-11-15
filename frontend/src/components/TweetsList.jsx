@@ -15,7 +15,7 @@ function TweetsList({
     likesCount = 0,
     isLiked,
 }) {
-    const avatar2 = useSelector((state) => state.user?.profileData?.avatar.url);
+    const avatar2 = useSelector((state) => state.user?.profileData?.avatar?.url);
     const authUsername = useSelector((state) => state.auth?.userData?.username);
     const dispatch = useDispatch();
 
@@ -26,12 +26,16 @@ function TweetsList({
         delete: false,
     });
 
-    const handleEditTweet = (editedContent) => {
-        dispatch(editTweet({ tweetId, content: editedContent }));
+    const handleEditTweet = async (editedContent) => {
+        const result = await dispatch(
+            editTweet({ tweetId, content: editedContent })
+        );
+        // Sirf kamyab edit par naya text dikhao (fail ho to purana hi rahe)
+        const saved = result?.type === "editTweet/fulfilled";
         setEditState((prevState) => ({
             ...prevState,
-            editing: false,
-            editedContent,
+            editing: !saved,
+            editedContent: saved ? result.payload?.content : prevState.editedContent,
             isOpen: false,
             delete: false,
         }));

@@ -9,8 +9,10 @@ function Button({
     ...props
 }) {
     return (
+        // type asli attribute hona chahiye: warna form ke andar har Button (Cancel/Reset bhi) submit kar deta tha
         <button
-            className={`${className} ${type} ${bgColor} ${textColor} hover:scale-110 duration-100 ease-in`}
+            type={type}
+            className={`${className} ${bgColor} ${textColor} hover:scale-110 duration-100 ease-in`}
             {...props}
         >
             {children}

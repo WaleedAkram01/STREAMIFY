@@ -58,7 +58,14 @@ function ChannelHeader({
                             )}
                         </div>
                     ) : (
-                        <div className="sm:h-40 h-28 w-full border-slate-600 border-b bg-black"></div>
+                        <div className="relative sm:h-40 h-28 w-full border-slate-600 border-b bg-black">
+                            {/* Cover na ho tab bhi edit mode mein naya cover add kar sakein */}
+                            {edit && (
+                                <div className="absolute inset-0 flex justify-center items-center">
+                                    <EditAvatar cover={true} />
+                                </div>
+                            )}
+                        </div>
                     )}
                 </section>
                 {/*channel details section  */}
