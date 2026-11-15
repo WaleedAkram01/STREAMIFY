@@ -10,13 +10,22 @@ function MySubscriptions() {
         (state) => state.subscription?.mySubscriptions
     );
     const subscriberId = useSelector((state) => state.auth?.userData?._id);
+    const loading = useSelector((state) => state.subscription?.loading);
     useEffect(() => {
         if (subscriberId) {
             dispatch(getSubscribedChannels(subscriberId));
         }
     }, [dispatch, subscriberId]);
     window.scrollTo(0, 0);
-    
+
+    if (!loading && subscriptions?.length === 0) {
+        return (
+            <div className="text-white text-center p-10">
+                You have not subscribed to any channel yet.
+            </div>
+        );
+    }
+
     return (
         <>
             <div className="flex gap-2 p-2 text-white items-center bg-[#222222]">

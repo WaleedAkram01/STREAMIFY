@@ -21,6 +21,7 @@ import {
     TermsAndConditions,
     ChannelPlaylist,
     PlaylistDetail,
+    NotFound,
 } from "./pages";
 import { EditPersonalInfo, ChangePassword, Layout } from "./components";
 
@@ -62,6 +63,15 @@ function App() {
                             </AuthLayout>
                         }
                     >
+                        {/* /channel/:username khud khule to bhi videos dikhen (avatar click yahin le jata hai) */}
+                        <Route
+                            index
+                            element={
+                                <AuthLayout authentication>
+                                    <ChannelVideos />
+                                </AuthLayout>
+                            }
+                        />
                         <Route
                             path="videos"
                             element={
@@ -136,6 +146,14 @@ function App() {
                         }
                     >
                         <Route
+                            index
+                            element={
+                                <AuthLayout authentication>
+                                    <EditPersonalInfo />
+                                </AuthLayout>
+                            }
+                        />
+                        <Route
                             path="personalInfo"
                             element={
                                 <AuthLayout authentication>
@@ -200,6 +218,11 @@ function App() {
                             <TermsAndConditions />
                         </AuthLayout>
                     }
+                />
+                {/* Galat URL par 404 page */}
+                <Route
+                    path="*"
+                    element={<NotFound />}
                 />
             </Routes>
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getAllVideos, makeVideosNull } from "../store/Slices/videoSlice";
-import { VideoList, Container } from "../components";
+import { VideoList, Container, NoVideosFound } from "../components";
 import HomeSkeleton from "../skeleton/HomeSkeleton";
 import InfiniteScroll from 'react-infinite-scroll-component';
 
@@ -41,6 +41,11 @@ function HomePage() {
                 });
         }
     }, [page, hasNextPage, dispatch]);
+
+    // Pehli dafa load ho raha hai to skeleton, koi video hi na ho to khali screen ki jagah message
+    if (!videos?.length) {
+        return loading ? <HomeSkeleton /> : <NoVideosFound />;
+    }
 
     return (
         <Container>

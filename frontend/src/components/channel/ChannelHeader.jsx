@@ -91,13 +91,10 @@ function ChannelHeader({
                             </h3>
                             <div className="flex gap-1">
                                 <p className="text-xs text-slate-400">
-                                    {localSubscribersCount &&
-                                        localSubscribersCount}{" "}
-                                    Subscribers
+                                    {localSubscribersCount ?? 0} Subscribers
                                 </p>
                                 <p className="text-xs text-slate-400">
-                                    {subscribedCount && subscribedCount}{" "}
-                                    Subscribed
+                                    {subscribedCount ?? 0} Subscribed
                                 </p>
                             </div>
                         </div>

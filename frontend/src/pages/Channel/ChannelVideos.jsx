@@ -56,7 +56,7 @@ function ChannelVideos() {
                             : "bg-[#222222]"
                     }`}
                 >
-                    Popluar
+                    Popular
                 </button>
                 <button
                     onClick={() => {

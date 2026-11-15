@@ -8,6 +8,7 @@ function ChannelTweets() {
     const authId = useSelector((state) => state.auth?.userData?._id);
     const userId = useSelector((state) => state.user?.profileData?._id);
     const tweets = useSelector((state) => state.tweet?.tweets);
+    const loading = useSelector((state) => state.tweet?.loading);
 
     useEffect(() => {
         if (userId) dispatch(getUserTweets(userId));
@@ -16,6 +17,9 @@ function ChannelTweets() {
     return (
         <>
             {authId === userId && <TweetAndComment tweet={true}/>}
+            {!loading && tweets?.length === 0 && (
+                <p className="text-white text-center p-5">No tweets yet</p>
+            )}
             {tweets?.map((tweet) => (
                 <TweetsList
                     key={tweet?._id}

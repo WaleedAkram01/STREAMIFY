@@ -25,12 +25,17 @@ function VideoDetail() {
     const hasNextPage = useSelector((state) => state.comment?.hasNextPage);
     const loading = useSelector((state) => state.comment?.loading);
     const [page, setPage] = useState(1);
+    const [notFound, setNotFound] = useState(false);
 
     useEffect(() => {
         if (videoId) {
             setPage(1); // nayi video par comments page 1 se
-            dispatch(getVideoById({ videoId }));
-            dispatch(getVideoComments({ videoId }));
+            setNotFound(false);
+            // Comments sirf tab mangwao jab video mil jaye (warna "Video not found" ka toast 2 dafa aata tha)
+            dispatch(getVideoById({ videoId })).then((result) => {
+                if (result.error) setNotFound(true);
+                else dispatch(getVideoComments({ videoId }));
+            });
         }
 
         return () => dispatch(cleanUpComments());
@@ -42,6 +47,22 @@ function VideoDetail() {
             setPage((prev) => prev + 1);
         }
     }, [page, loading, hasNextPage, dispatch, videoId]);
+
+    // Video load ho rahi hai -> spinner, na mile (deleted / galat id) -> message, khali player nahi
+    if (notFound || video?._id !== videoId) {
+        return (
+            <>
+                <Navbar />
+                <div className="w-full flex justify-center items-center h-96">
+                    {notFound ? (
+                        <p className="text-white text-lg">Video not found</p>
+                    ) : (
+                        <Spinner width={10} />
+                    )}
+                </div>
+            </>
+        );
+    }
 
     return (
         <>

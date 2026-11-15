@@ -13,6 +13,7 @@ import SearchVideos from "./SearchVideos";
 import TermsAndConditions from "./TermsAndConditions ";
 import ChannelPlaylist from "./Channel/ChannelPlaylist";
 import PlaylistDetail from "./PlaylistDetail";
+import NotFound from "./NotFound";
 
 export {
     Channel,
@@ -30,4 +31,5 @@ export {
     TermsAndConditions,
     ChannelPlaylist,
     PlaylistDetail,
+    NotFound,
 }
