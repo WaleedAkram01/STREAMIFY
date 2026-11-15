@@ -7,6 +7,10 @@ const videoSchema = new Schema(
       type: String, // Cloudinary ka secure URL
       required: [true, "Video file is required"], // Required lagana zaroori hai
     },
+    videoPublicId: {
+      type: String, // Cloudinary public ID, taake delete karte waqt video cloud se bhi hat jaye
+      trim: true,
+    },
     // thumbnail: {
     //   type: String, // Cloudinary ka secure URL
     //   required: [true, "Thumbnail is required"], // Required lagana zaroori hai

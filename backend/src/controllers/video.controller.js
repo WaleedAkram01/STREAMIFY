@@ -12,6 +12,12 @@ import {
 import { Video } from "../models/video.models.js";
 import { Comment } from "../models/comment.model.js";
 import { User } from "../models/user.models.js";
+import { Like } from "../models/like.model.js";
+import { Playlist } from "../models/playlist.model.js";
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from "../utils/constants.js";
+
+// HELPER: user ka search text regex mein safe banane ke liye (special chars escape)
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // HELPER FUNCTION: Seconds ko "MM:SS" format mein convert karne ke liye
 const formatDuration = (totalSeconds) => {
@@ -23,8 +29,24 @@ const formatDuration = (totalSeconds) => {
 // GET ALL VIDEOS CONTROLLER (Infinite Scroll & Search)
 export const getAllVideos = asyncHandler(async (req, res) => {
   // Query parameters se filters aur cursor nikalna
-  const { query, sortBy = "createdAt", nextId, limit = 10 } = req.query;
-  const limitValue = parseInt(limit, 10);
+  const { query, nextId, userId, limit = DEFAULT_PAGE_LIMIT } = req.query;
+  // limit ko 1..MAX_PAGE_LIMIT ke beech rakhein
+  const limitValue = Math.min(
+    Math.max(parseInt(limit, 10) || DEFAULT_PAGE_LIMIT, 1),
+    MAX_PAGE_LIMIT,
+  );
+
+  // Cursor (nextId) valid ObjectId hona chahiye, warna 500 crash hota tha
+  if (nextId?.trim() && !isValidObjectId(nextId.trim())) {
+    throw new ApiError(400, "Invalid nextId cursor");
+  }
+
+  // Optional: sirf kisi aik channel (owner) ki videos (channel page ke liye)
+  if (userId?.trim() && !isValidObjectId(userId.trim())) {
+    throw new ApiError(400, "Invalid userId");
+  }
+
+  const searchText = query?.trim() ? escapeRegex(query.trim()) : "";
 
   // Advanced Aggregation Pipeline for infinite scroll matching and population
   const videos = await Video.aggregate([
@@ -32,11 +54,14 @@ export const getAllVideos = asyncHandler(async (req, res) => {
       // Stage 1: Filter out inactive videos, apply search queries, and slice using cursor ID
       $match: {
         isPublished: true,
+        ...(userId?.trim() && {
+          owner: new mongoose.Types.ObjectId(userId.trim()),
+        }),
         // Safe Text Search: Dynamic evaluation if search text is provided
-        ...(query?.trim() && {
+        ...(searchText && {
           $or: [
-            { title: { $regex: query.trim(), $options: "i" } },
-            { description: { $regex: query.trim(), $options: "i" } },
+            { title: { $regex: searchText, $options: "i" } },
+            { description: { $regex: searchText, $options: "i" } },
           ],
         }),
         // Infinite Scroll Logic: Fetch only items older than the received cursor ID
@@ -46,10 +71,10 @@ export const getAllVideos = asyncHandler(async (req, res) => {
       },
     },
     {
-      // Stage 2: Sort order handling sequence (Latest uploaded videos appear first)
+      // Stage 2: Latest videos pehle. Cursor (_id $lt) sirf _id/createdAt order ke saath
+      // sahi kaam karta hai, isliye sortBy query param yahan use nahi hota
       $sort: {
-        [sortBy]: -1,
-        _id: -1, // Tie-breaker sort order maintaining index stability
+        _id: -1,
       },
     },
     {
@@ -88,7 +113,7 @@ export const getAllVideos = asyncHandler(async (req, res) => {
           _id: 1,
           username: 1,
           fullName: 1,
-          avatar: 1,
+          "avatar.url": 1,
         },
       },
     },
@@ -145,10 +170,9 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload video to cloud storage");
   }
 
+  // eager_async mein eager[0].secure_url foran nahi milta, isliye fallback zaroori hai
   const hlsStreamingUrl =
-    videoUploadResult.eager && videoUploadResult.eager[0]
-      ? videoUploadResult.eager[0].secure_url
-      : videoUploadResult.secure_url;
+    videoUploadResult.eager?.[0]?.secure_url || videoUploadResult.secure_url;
 
   let finalThumbnailUrl = "";
   let finalThumbnailPublicId = "";
@@ -180,9 +204,10 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
   const formattedDurationText = formatDuration(rawSeconds);
 
   const video = await Video.create({
-    title,
-    description,
+    title: title.trim(),
+    description: description.trim(),
     videoFile: hlsStreamingUrl,
+    videoPublicId: videoUploadResult.public_id,
     thumbnail: {
       url: finalThumbnailUrl,
       publicId: finalThumbnailPublicId,
@@ -211,15 +236,9 @@ export const PublishAVideo = asyncHandler(async (req, res) => {
 // We will extracct video, owner, likes, comments, and other details using aggregation pipeline
 export const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  // let userId = req.body;
 
-  // userId = new mongoose.Types.ObjectId(userId)
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid videoId");
-  }
-
-  if (!isValidObjectId(req.user?._id)) {
-    throw new ApiError(400, "Invalid userId");
   }
 
   const video = await Video.aggregate([
@@ -272,6 +291,7 @@ export const getVideoById = asyncHandler(async (req, res) => {
           {
             $project: {
               username: 1,
+              fullName: 1,
               "avatar.url": 1,
               subscribersCount: 1,
               isSubscribed: 1,
@@ -299,13 +319,14 @@ export const getVideoById = asyncHandler(async (req, res) => {
     },
     {
       $project: {
-        "videoFile.url": 1,
+        videoFile: 1, // videoFile plain string URL hai ("videoFile.url" kuch return nahi karta tha)
+        "thumbnail.url": 1,
         title: 1,
         description: 1,
         views: 1,
         createdAt: 1,
         duration: 1,
-        comments: 1,
+        isPublished: 1,
         owner: 1,
         likesCount: 1,
         isLiked: 1,
@@ -313,8 +334,17 @@ export const getVideoById = asyncHandler(async (req, res) => {
     },
   ]);
 
-  if (!video) {
-    throw new ApiError(500, "failed to fetch video");
+  // aggregate hamesha array deta hai, isliye length check karna zaroori hai
+  if (!video.length) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Unpublished video sirf owner dekh sakta hai
+  if (
+    !video[0].isPublished &&
+    video[0].owner?._id?.toString() !== req.user?._id.toString()
+  ) {
+    throw new ApiError(404, "Video not found");
   }
 
   // increment views if video fetched successfully
@@ -336,69 +366,71 @@ export const getVideoById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, video[0], "video details fetched successfully"));
 });
 
-// update video details like title, description, thumbnail
+// UPDATE VIDEO CONTROLLER (title, description, thumbnail — sab optional, kam az kam aik zaroori)
 export const updateVideo = asyncHandler(async (req, res) => {
-  console.log(req.body);
+  // 1. Input nikalna
   const { title, description } = req.body;
   const { videoId } = req.params;
+  const thumbnailLocalPath = req.file?.path;
 
+  // 2. Validation
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid videoId");
   }
 
-  if (!(title && description)) {
-    throw new ApiError(400, "title and description are required");
+  if (!title?.trim() && !description?.trim() && !thumbnailLocalPath) {
+    throw new ApiError(
+      400,
+      "Provide at least one of title, description or thumbnail to update",
+    );
   }
 
+  // 3. Video dhoondna
   const video = await Video.findById(videoId);
-
   if (!video) {
     throw new ApiError(404, "No video found");
   }
 
-  if (video?.owner.toString() !== req.user?._id.toString()) {
-    throw new ApiError(
-      400,
-      "You can't edit this video as you are not the owner",
-    );
+  // 4. Ownership check -> 403
+  if (video.owner?.toString() !== req.user?._id.toString()) {
+    throw new ApiError(403, "You can't edit this video as you are not the owner");
   }
 
-  //deleting old thumbnail and updating with new one
-  const thumbnailToDelete = video.thumbnail.public_id;
+  const updateFields = {};
+  if (title?.trim()) updateFields.title = title.trim();
+  if (description?.trim()) updateFields.description = description.trim();
 
-  const thumbnailLocalPath = req.file?.path;
-
-  if (!thumbnailLocalPath) {
-    throw new ApiError(400, "thumbnail is required");
-  }
-
-  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-
-  if (!thumbnail) {
-    throw new ApiError(400, "thumbnail not found");
+  // 5. Pehle NAYI thumbnail upload karo, phir DB update, phir purani delete
+  // (pehle delete karne se upload fail hone par purani bhi chali jati)
+  const oldThumbnailPublicId = video.thumbnail?.publicId;
+  if (thumbnailLocalPath) {
+    const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!thumbnail) {
+      throw new ApiError(500, "Failed to upload thumbnail to cloud storage");
+    }
+    updateFields.thumbnail = {
+      url: thumbnail.secure_url,
+      publicId: thumbnail.public_id,
+    };
   }
 
   const updatedVideo = await Video.findByIdAndUpdate(
     videoId,
-    {
-      $set: {
-        title,
-        description,
-        thumbnail: {
-          public_id: thumbnail.public_id,
-          url: thumbnail.url,
-        },
-      },
-    },
-    { new: true },
+    { $set: updateFields },
+    { new: true, runValidators: true },
   );
 
   if (!updatedVideo) {
     throw new ApiError(500, "Failed to update video please try again");
   }
 
-  if (updatedVideo) {
-    await deleteFromCloudinary(thumbnailToDelete);
+  // 6. Purani custom thumbnail delete (auto-generated thumbnail ka publicId video wala hota hai, usko skip)
+  if (
+    updateFields.thumbnail &&
+    oldThumbnailPublicId &&
+    oldThumbnailPublicId !== video.videoPublicId
+  ) {
+    await deleteFromCloudinary(oldThumbnailPublicId);
   }
 
   return res
@@ -406,7 +438,7 @@ export const updateVideo = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedVideo, "Video updated successfully"));
 });
 
-// toggle publish status of a video
+// TOGGLE PUBLISH STATUS CONTROLLER
 export const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
@@ -420,10 +452,10 @@ export const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
-  if (video?.owner.toString() !== req.user?._id.toString()) {
+  if (video.owner?.toString() !== req.user?._id.toString()) {
     throw new ApiError(
-      400,
-      "You can't toogle publish status as you are not the owner",
+      403,
+      "You can't toggle publish status as you are not the owner",
     );
   }
 
@@ -431,14 +463,14 @@ export const togglePublishStatus = asyncHandler(async (req, res) => {
     videoId,
     {
       $set: {
-        isPublished: !video?.isPublished,
+        isPublished: !video.isPublished,
       },
     },
     { new: true },
   );
 
   if (!toggledVideoPublish) {
-    throw new ApiError(500, "Failed to toogle video publish status");
+    throw new ApiError(500, "Failed to toggle video publish status");
   }
 
   return res
@@ -452,8 +484,8 @@ export const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
-// delete video
-// One thing I missed here is video deletion from cloudianry that is missed
+// DELETE VIDEO CONTROLLER
+// Video + uski thumbnail/video file (Cloudinary) + likes + comments + playlist entries sab saaf
 export const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
@@ -467,33 +499,48 @@ export const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No video found");
   }
 
-  if (video?.owner.toString() !== req.user?._id.toString()) {
+  if (video.owner?.toString() !== req.user?._id.toString()) {
     throw new ApiError(
-      400,
+      403,
       "You can't delete this video as you are not the owner",
     );
   }
 
-  const videoDeleted = await Video.findByIdAndDelete(video?._id);
+  const videoDeleted = await Video.findByIdAndDelete(video._id);
 
   if (!videoDeleted) {
-    throw new ApiError(400, "Failed to delete the video please try again");
+    throw new ApiError(500, "Failed to delete the video please try again");
   }
 
-  await deleteOnCloudinary(video.thumbnail.public_id); // video model has thumbnail public_id stored in it->check videoModel
-  //   await deleteOnCloudinary(video.videoFile.public_id, "video"); // specify video while deleting video
+  // Cloudinary cleanup
+  const thumbnailPublicId = video.thumbnail?.publicId;
+  if (thumbnailPublicId && thumbnailPublicId !== video.videoPublicId) {
+    await deleteFromCloudinary(thumbnailPublicId);
+  }
+  if (video.videoPublicId) {
+    await deleteFromCloudinary(video.videoPublicId, "video");
+  }
 
-  // delete video likes
-  await Like.deleteMany({
-    video: videoId,
-  });
+  // Comments ke likes bhi delete karne ke liye pehle comment IDs nikal lo
+  const commentIds = await Comment.find({ video: videoId }).distinct("_id");
 
-  // delete video comments
-  await Comment.deleteMany({
-    video: videoId,
-  });
+  await Promise.all([
+    // Video ke likes + uske comments ke likes
+    Like.deleteMany({
+      $or: [{ video: videoId }, { comment: { $in: commentIds } }],
+    }),
+    // Video ke comments
+    Comment.deleteMany({ video: videoId }),
+    // Playlists se video hatao
+    Playlist.updateMany({ videos: videoId }, { $pull: { videos: videoId } }),
+    // Watch history se video hatao
+    User.updateMany(
+      { watchHistory: videoId },
+      { $pull: { watchHistory: videoId } },
+    ),
+  ]);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Video deleted successfully"));
+    .json(new ApiResponse(200, { videoId }, "Video deleted successfully"));
 });

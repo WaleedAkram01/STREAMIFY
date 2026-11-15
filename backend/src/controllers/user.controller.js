@@ -9,6 +9,7 @@ import {
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "../utils/sendEmail.js";
+import { cookieOptions } from "../utils/constants.js";
 
 // Helper function to generate access and refresh tokens and save refresh token in database
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -29,15 +30,12 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 // 1-REGISTER USER CONTROLLER
 export const registerUser = asyncHandler(async (req, res) => {
-  console.log("req.body:", req.body);
-  console.log("req.files:", req.files);
-
   // 1. Frontend se data receive karna (req.body)
   const { fullName, email, username, password } = req.body;
 
   // 2. Validation check: Koi bhi field khali ya undefined nahi honi chahiye
   if (
-    [fullName, email, username, password].some((field) => field?.trim() === "")
+    [fullName, email, username, password].some((field) => !field?.trim())
   ) {
     throw new ApiError(
       400,
@@ -46,8 +44,12 @@ export const registerUser = asyncHandler(async (req, res) => {
   }
 
   // 3. Check karna ke user pehle se register toh nahi hai (by email ya username)
+  // Schema lowercase karke save karta hai, isliye search bhi lowercase mein
+  const normalizedUsername = username.toLowerCase().trim();
+  const normalizedEmail = email.toLowerCase().trim();
+
   const existedUser = await User.findOne({
-    $or: [{ username }, { email }],
+    $or: [{ username: normalizedUsername }, { email: normalizedEmail }],
   });
 
   if (existedUser) {
@@ -79,25 +81,27 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   // Agar kisi wajah se Cloudinary par avatar upload fail ho jaye
   if (!avatar) {
-    throw new ApiError(400, "Failed to upload avatar image to cloud storage");
+    // Cover upload ho gaya tha to usko bhi saaf karein
+    if (coverImage?.public_id) await deleteFromCloudinary(coverImage.public_id);
+    throw new ApiError(500, "Failed to upload avatar image to cloud storage");
   }
 
   // 7. Database mein naya User object (entry) create karna
   const user = await User.create({
     fullName,
     avatar: {
-      url: avatar.url,
+      url: avatar.secure_url,
       publicId: avatar.public_id,
     },
     coverImage: coverImage
       ? {
-          url: coverImage.url,
+          url: coverImage.secure_url,
           publicId: coverImage.public_id,
         }
       : undefined,
-    email,
+    email: normalizedEmail,
     password, // Yeh save hone se pehle model ka pre-save hook automatic hash kar dega
-    username: username,
+    username: normalizedUsername,
   });
 
   // 8. Security Optimization: Response bhejne se pehle password aur refresh token remove karna
@@ -131,20 +135,27 @@ export const loginUser = asyncHandler(async (req, res) => {
   }
 
   // 3. Database mein user ko search karna (Chahe email match ho ya username)
-  const user = await User.findOne({
-    $or: [{ username: username }, { email: email }],
-  });
+  // Sirf wahi field query mein daalein jo bheji gayi hai (lowercase, schema ki tarah)
+  const conditions = [];
+  if (username?.trim()) {
+    conditions.push({ username: username.toLowerCase().trim() });
+  }
+  if (email?.trim()) {
+    conditions.push({ email: email.toLowerCase().trim() });
+  }
 
-  // Agar user database me nahi milta
+  const user = await User.findOne({ $or: conditions });
+
+  // Same 401 message chahe user na mile ya password galat ho (user enumeration se bachao)
   if (!user) {
-    throw new ApiError(444, "User does not exist with this username or email");
+    throw new ApiError(401, "Invalid credentials");
   }
 
   // 4. Password Validation (Hamaray banaye huay custom method 'isPasswordCorrect' se check karein)
   const isPasswordValid = await user.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid user credentials / Wrong password");
+    throw new ApiError(401, "Invalid credentials");
   }
 
   // 5. Access and Refresh Tokens generate karna
@@ -157,18 +168,12 @@ export const loginUser = asyncHandler(async (req, res) => {
     "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
   );
 
-  // 7. Cookies ke liye secure options configure karna
-  const options = {
-    httpOnly: true, // Frontend JavaScript is token ko read ya hack nahi kar sakti (XSS protection)
-    secure: true, // Sirf HTTPS par chalega production me
-    sameSite: "none",
-  };
-
+  // 7. Cookie options constants.js se aate hain (login/refresh/logout sab same)
   // 8. Cookies set karna aur client ko success response bhej dena
   return res
     .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
     .json(
       new ApiResponse(
         200,
@@ -185,27 +190,17 @@ export const loginUser = asyncHandler(async (req, res) => {
 
 // 3-LOGOUT USER CONTROLLER
 export const logoutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        refreshToken: undefined,
-      },
+  // $set: undefined ko Mongoose ignore kar deta hai (token DB mein reh jata tha), isliye $unset
+  await User.findByIdAndUpdate(req.user._id, {
+    $unset: {
+      refreshToken: 1,
     },
-    {
-      new: true,
-    },
-  );
-
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
+  });
 
   return res
     .status(200)
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
+    .clearCookie("accessToken", cookieOptions)
+    .clearCookie("refreshToken", cookieOptions)
     .json(new ApiResponse(200, {}, "User logged Out"));
 });
 
@@ -228,7 +223,6 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
     );
   } catch (error) {
-    console.log("JWT Verify Error:", error.message);
     throw new ApiError(401, "Invalid or expired refresh token");
   }
 
@@ -244,13 +238,6 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Refresh token is expired or already used!");
   }
 
-  // 5. Cookie options setup
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production" ? true : false,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  };
-
   // 6. Naye tokens generate karna
   // 🔥 Sahi tarike se variable rename kar ke tokens nikalna
   const { accessToken, refreshToken: newRefreshToken } =
@@ -259,8 +246,8 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
   // 7. Standard ApiResponse ke saath response send karna
   return res
     .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", newRefreshToken, options)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", newRefreshToken, cookieOptions)
     .json(
       new ApiResponse(
         200,
@@ -324,7 +311,7 @@ export const forgotPasswordSendOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is required.");
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase().trim() });
 
   // Security Rule: Return generic success to prevent email fishing/enumerations
   if (!user) {
@@ -351,7 +338,7 @@ export const forgotPasswordSendOTP = asyncHandler(async (req, res) => {
             <div style="text-align: center; margin: 30px 0;">
                 <h2 style="letter-spacing: 6px; color: #4F46E5; background-color: #f3f4f6; display: inline-block; padding: 12px 24px; border-radius: 6px; font-size: 32px; margin: 0;">${otp}</h2>
             </div>
-            <p style="font-size: 14px; color: #777777; text-align: center;">This OTP is valid for only 1 minutes. Do not share it with anyone.</p>
+            <p style="font-size: 14px; color: #777777; text-align: center;">This OTP is valid for only 5 minutes. Do not share it with anyone.</p>
         </div>
     `;
 
@@ -485,17 +472,12 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found.");
   }
 
-  // 3. Delete previous asset from Cloudinary using nested property directly
-  if (user.avatar?.publicId) {
-    await deleteFromCloudinary(user.avatar.publicId);
-  }
-
-  // 4. Upload incoming local image file to Cloudinary
+  // 3-4. Pehle NAYI image upload karo (purani pehle delete karne se upload fail par avatar gayab ho jata)
+  const oldAvatarPublicId = user.avatar?.publicId;
   const avatar = await uploadOnCloudinary(avatarLocalPath);
-  console.log(avatar);
 
-  if (!avatar || !avatar.url) {
-    throw new ApiError(400, "Error while uploading avatar to cloud storage.");
+  if (!avatar?.secure_url) {
+    throw new ApiError(500, "Error while uploading avatar to cloud storage.");
   }
 
   // 5. Update the nested object fields inside MongoDB
@@ -504,7 +486,7 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
     {
       $set: {
         avatar: {
-          url: avatar.url, // Cloudinary URL
+          url: avatar.secure_url, // Cloudinary HTTPS URL
           publicId: avatar.public_id, // Cloudinary Public ID
         },
       },
@@ -513,6 +495,11 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
   ).select(
     "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
   );
+
+  // 6. Ab purani image Cloudinary se delete karo
+  if (oldAvatarPublicId) {
+    await deleteFromCloudinary(oldAvatarPublicId);
+  }
 
   return res
     .status(200)
@@ -536,18 +523,13 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found.");
   }
 
-  // 3. Delete previous cover image if it exists
-  if (user.coverImage?.publicId) {
-    await deleteFromCloudinary(user.coverImage.publicId);
-  }
-
-  // 4. Upload the incoming local cover image to Cloudinary
+  // 3-4. Pehle NAYI cover upload karo, purani baad mein delete hogi
+  const oldCoverPublicId = user.coverImage?.publicId;
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-  console.log(coverImage);
 
-  if (!coverImage || !coverImage.url) {
+  if (!coverImage?.secure_url) {
     throw new ApiError(
-      400,
+      500,
       "Error while uploading cover image to cloud storage.",
     );
   }
@@ -558,7 +540,7 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
     {
       $set: {
         coverImage: {
-          url: coverImage.url,
+          url: coverImage.secure_url,
           publicId: coverImage.public_id,
         },
       },
@@ -567,6 +549,11 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
   ).select(
     "-password -refreshToken -forgotPasswordOTP -forgotPasswordOTPExpiry",
   );
+
+  // 6. Purani cover image delete
+  if (oldCoverPublicId) {
+    await deleteFromCloudinary(oldCoverPublicId);
+  }
 
   return res
     .status(200)
@@ -637,9 +624,9 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
         subscribersCount: 1,
         channelsSubscribedToCount: 1,
         isSubscribed: 1,
-        avatar: 1, // Passes the { url, publicId } object cleanly to frontend
-        coverImage: 1, // Passes the { url, publicId } object cleanly to frontend
-        email: 1,
+        "avatar.url": 1,
+        "coverImage.url": 1,
+        // email yahan nahi bhejte: kisi doosre ka channel dekhne par uska email leak hota tha
       },
     },
   ]);

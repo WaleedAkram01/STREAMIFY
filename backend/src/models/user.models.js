@@ -138,7 +138,7 @@ userSchema.methods.generateForgotPasswordOTP = function () {
   this.forgotPasswordOTP = otp;
 
   // OTP ki expiry kam rakhein (e.g., 5 minutes) kyunki OTP jaldi expire hona chahiye
-  this.forgotPasswordOTPExpiry = Date.now() + 1 * 60 * 1000;
+  this.forgotPasswordOTPExpiry = Date.now() + 5 * 60 * 1000;
 
   return otp; // Controller ko return karein taake email mein bheja ja sakay
 };

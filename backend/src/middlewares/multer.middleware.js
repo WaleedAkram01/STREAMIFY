@@ -1,6 +1,8 @@
 import multer from "multer";
 import path from "path";
+import { ApiError } from "../utils/ApiError.js";
 
+// --- DISK STORAGE FOR IMAGES (avatar, coverImage, thumbnail update) ---
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "./public/temp");
@@ -12,7 +14,19 @@ const storage = multer.diskStorage({
   },
 });
 
-export const upload = multer({ storage: storage });
+export const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB Max image
+  },
+  fileFilter: (req, file, cb) => {
+    // Sirf images allow hain
+    if (file.mimetype.startsWith("image/")) {
+      return cb(null, true);
+    }
+    return cb(new ApiError(400, `${file.fieldname} must be an image!`), false);
+  },
+});
 
 // --- MEMORY STORAGE FOR VIDEO WITH EXTENSION FILTER ---
 const videoMemoryStorage = multer.memoryStorage();
@@ -28,7 +42,7 @@ export const uploadVideoFields = multer({
       if (file.mimetype.startsWith("image/")) {
         return cb(null, true);
       } else {
-        return cb(new Error("Thumbnail must be an image!"), false);
+        return cb(new ApiError(400, "Thumbnail must be an image!"), false);
       }
     }
 
@@ -51,7 +65,8 @@ export const uploadVideoFields = multer({
         return cb(null, true);
       } else {
         return cb(
-          new Error(
+          new ApiError(
+            400,
             "Invalid video format! Only standard video formats are allowed.",
           ),
           false,
@@ -60,6 +75,6 @@ export const uploadVideoFields = multer({
     }
 
     // Agar koi aur field ho to reject kar dein
-    cb(new Error("Unknown field name!"), false);
+    cb(new ApiError(400, `Unknown file field: ${file.fieldname}`), false);
   },
 });

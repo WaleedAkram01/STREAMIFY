@@ -69,10 +69,13 @@ export const uploadImageBufferOnCloudinary = (fileBuffer) => {
 };
 
 // To delete from cloudinary
-export const deleteFromCloudinary = async (publicId) => {
+// resourceType: "image" (default) ya "video" (video delete karte waqt zaroori hai)
+export const deleteFromCloudinary = async (publicId, resourceType = "image") => {
   try {
     if (!publicId) return null;
-    const response = await cloudinary.uploader.destroy(publicId);
+    const response = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
     return response;
   } catch (error) {
     console.error(

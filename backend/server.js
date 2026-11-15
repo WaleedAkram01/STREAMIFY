@@ -1,11 +1,8 @@
-import dotenv from "dotenv";
-import connectDB from "./src/config/db.js"; // Aapki db.js ka sahi path (.js extension zaroori hai)
+// Env sab se pehle load honi chahiye: ESM mein imports baaki code se pehle chalte hain,
+// isliye dotenv.config() neeche likhne se cloudinary.js jaisi files ko env nahi milti thi
+import "dotenv/config";
+import connectDB from "./src/config/db.js";
 import { app } from "./app.js";
-
-// Dotenv configuration sabse upar honi chahiye
-dotenv.config({
-  path: "./.env",
-});
 
 const PORT = process.env.PORT || 8000;
 
@@ -18,4 +15,5 @@ connectDB()
   })
   .catch((err) => {
     console.log("❌ MongoDB connection failed !!! ", err);
+    process.exit(1);
   });
