@@ -7,6 +7,7 @@ import {
     removeVideoFromPlaylist,
 } from "../store/Slices/playlistSlice";
 import { Button, Container, VideoList } from "../components";
+import PlaylistCover from "../components/PlaylistCover";
 
 function PlaylistDetail() {
     const { playlistId } = useParams();
@@ -38,8 +39,16 @@ function PlaylistDetail() {
     return (
         <Container>
             <div className="text-white p-3 sm:p-5 space-y-2 border-b border-slate-600">
-                <div className="flex justify-between items-start gap-3">
-                    <div>
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="w-full sm:w-72 shrink-0 pt-2">
+                        <PlaylistCover
+                            thumbnails={(playlist.videos || [])
+                                .map((v) => v.thumbnail?.url)
+                                .filter(Boolean)}
+                            totalVideos={playlist.totalVideos}
+                        />
+                    </div>
+                    <div className="flex-1">
                         <h1 className="text-2xl font-bold">{playlist.name}</h1>
                         <p className="text-sm text-slate-400">
                             {playlist.description}
@@ -86,7 +95,7 @@ function PlaylistDetail() {
                                         removeVideoFromPlaylist({
                                             videoId: video._id,
                                             playlistId,
-                                        })
+                                        }),
                                     )
                                 }
                             >

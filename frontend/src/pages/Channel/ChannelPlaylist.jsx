@@ -5,6 +5,8 @@ import {
     getPlaylistsByUser,
 } from "../../store/Slices/playlistSlice";
 import { Button, Input } from "../../components";
+import PlaylistCover from "../../components/PlaylistCover";
+import axiosInstance from "../../helpers/axiosInstance";
 import { useForm } from "react-hook-form";
 import { IoCloseCircleOutline } from "../../components/icons";
 import { timeAgo } from "../../helpers/timeAgo";
@@ -21,12 +23,45 @@ function ChannelPlaylist() {
         formState: { errors },
     } = useForm();
     const [openCreatePlaylist, setOpenCreatePlaylist] = useState(false);
+    // playlistId -> thumbnail urls (jab backend "thumbnails" na bheje to yahan fetch karte hain)
+    const [covers, setCovers] = useState({});
 
     useEffect(() => {
         if (userId) {
             dispatch(getPlaylistsByUser(userId));
         }
     }, [dispatch, userId]);
+
+    useEffect(() => {
+        const missing = (playlists || []).filter(
+            (p) => !p.thumbnails && p.totalVideos > 0 && !covers[p._id],
+        );
+        if (!missing.length) return;
+        let cancelled = false;
+        Promise.all(
+            missing.map((p) =>
+                axiosInstance
+                    .get(`/playlists/${p._id}`)
+                    .then((res) => [
+                        p._id,
+                        (res.data?.data?.videos || [])
+                            .map((v) => v.thumbnail?.url)
+                            .filter(Boolean)
+                            .slice(0, 4),
+                    ])
+                    .catch(() => [p._id, []]),
+            ),
+        ).then((entries) => {
+            if (!cancelled)
+                setCovers((prev) => ({
+                    ...prev,
+                    ...Object.fromEntries(entries),
+                }));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [playlists]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const createPlaylist = (data) => {
         dispatch(createAPlaylist(data));
@@ -110,24 +145,27 @@ function ChannelPlaylist() {
                         <Link
                             to={`/playlist/${playlist._id}`}
                             key={playlist._id}
-                            className="relative h-[15rem] w-full border border-slate-500"
+                            className="group block w-full pt-2"
                         >
-                            <div className="absolute flex justify-between bottom-0 left-0 border-t py-1 px-2 w-full backdrop-contrast-75">
-                                <div className="flex flex-col gap-1">
-                                    <h1 className="text-lg">Playlist</h1>
-                                    <div className="text-xs text-slate-300">
-                                        {playlist.totalViews} Views &nbsp;
-                                        {timeAgo(playlist.updatedAt)}
-                                    </div>
-                                </div>
-                                <p>{playlist.totalVideos} Videos</p>
-                            </div>
-                            <div className=" py-1 px-2">
-                                <p className="text-sm font-bold">
+                            <PlaylistCover
+                                thumbnails={
+                                    playlist.thumbnails ||
+                                    covers[playlist._id] ||
+                                    []
+                                }
+                                totalVideos={playlist.totalVideos}
+                                className="group-hover:opacity-90 transition-opacity"
+                            />
+                            <div className="py-2 px-1">
+                                <p className="font-semibold group-hover:text-purple-300">
                                     {playlist.name}
                                 </p>
-                                <p className="text-xs w-full h-4 overflow-hidden">
+                                <p className="text-xs text-slate-400 line-clamp-1">
                                     {playlist.description}
+                                </p>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {playlist.totalViews} views ·{" "}
+                                    {timeAgo(playlist.updatedAt)}
                                 </p>
                             </div>
                         </Link>

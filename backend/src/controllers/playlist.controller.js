@@ -301,6 +301,10 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         totalViews: {
           $sum: "$videos.views",
         },
+        // Pehli 4 videos ke thumbnails: playlist card ka cover banane ke liye
+        thumbnails: {
+          $slice: ["$videos.thumbnail.url", 4],
+        },
       },
     },
     {
@@ -313,6 +317,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         description: 1,
         totalVideos: 1,
         totalViews: 1,
+        thumbnails: 1,
         updatedAt: 1,
       },
     },
