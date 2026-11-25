@@ -1,3 +1,8 @@
+const ago = (value, unit) => {
+    const n = Math.max(1, Math.round(value));
+    return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+};
+
 export function timeAgo(createdAt) {
     const now = new Date();
     const difference = Math.abs(now - new Date(createdAt));
@@ -10,17 +15,17 @@ export function timeAgo(createdAt) {
     const years = weeks / 52;
 
     if (seconds < 60) {
-        return `${Math.round(seconds)} seconds ago`;
+        return ago(seconds, "second");
     } else if (minutes < 60) {
-        return `${Math.round(minutes)} minutes ago`;
+        return ago(minutes, "minute");
     } else if (hours < 24) {
-        return `${Math.round(hours)} hours ago`;
+        return ago(hours, "hour");
     } else if (days < 7) {
-        return `${Math.round(days)} days ago`;
+        return ago(days, "day");
     } else if (weeks < 52) {
-        return `${Math.round(weeks)} weeks ago`;
+        return ago(weeks, "week");
     } else {
-        return `${Math.round(years)} years ago`;
+        return ago(years, "year");
     }
 }
 
